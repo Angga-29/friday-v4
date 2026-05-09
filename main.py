@@ -401,14 +401,7 @@ def jalankan():
                     if ada_gerak:
                         waktu_gerak_terakhir = waktu_kini
                         if waktu_kini - waktu_terakhir_gerak > COOLDOWN_GERAK:
-                            # Tampilkan notifikasi di layar TANPA suara
-                            # agar tidak mengganggu siklus dengarkan
-                            if not state["cache_cuaca"]:
-                                state["cache_cuaca"] = dapatkan_cuaca(
-                                    config.API_KEY_CUACA, config.KOTA_CUACA
-                                )
                             tampilkan_status("⚡ Gerakan terdeteksi.", "deteksi")
-                            tampilkan_status(f"   Cuaca: {state['cache_cuaca']}", "info")
                             waktu_terakhir_gerak = waktu_kini
 
                 if frame_gray is not None:
