@@ -98,16 +98,16 @@ def _generate_edge_tts_sync(teks: str) -> bool:
 
 def _putar_audio(file_path: str) -> bool:
     """
-    Putar audio dengan player yang tersedia — semua BLOCKING.
-    termux-media-player TIDAK dipakai karena non-blocking.
+    Putar audio — hanya player yang BENAR-BENAR blocking di Android.
+    play (sox) dihapus: return 0 tapi tidak ada suara di Termux Android.
+    Jika semua gagal → return False → _bicara_internal pakai Termux TTS.
     """
     global _mpv_missing_logged
 
-    # Cek ukuran file — MP3 kosong/corrupt tidak perlu diputar
     try:
         ukuran = os.path.getsize(file_path)
         if ukuran < 512:
-            tampilkan_status(f"File audio terlalu kecil ({ukuran} bytes) — skip.", "peringatan")
+            tampilkan_status(f"File audio terlalu kecil ({ukuran}b) — skip.", "peringatan")
             return False
     except OSError:
         return False
@@ -117,7 +117,6 @@ def _putar_audio(file_path: str) -> bool:
                     "--quiet", "--really-quiet", file_path]),
         ("ffplay", ["ffplay", "-nodisp", "-autoexit",
                     "-volume", "100", "-loglevel", "quiet", file_path]),
-        ("play",   ["play", "-q", file_path]),
     ]
 
     for nama, cmd in players:
@@ -126,18 +125,23 @@ def _putar_audio(file_path: str) -> bool:
             if ret.returncode == 0:
                 tampilkan_status(f"Audio diputar via {nama}.", "info")
                 return True
+            else:
+                # Log error mpv/ffplay agar bisa didiagnosis
+                err_out = ret.stderr.decode(errors="ignore").strip()
+                if err_out:
+                    tampilkan_status(f"{nama} gagal: {err_out[:120]}", "peringatan")
         except FileNotFoundError:
             continue
         except subprocess.TimeoutExpired:
-            tampilkan_status(f"{nama} timeout saat memutar audio.", "peringatan")
+            tampilkan_status(f"{nama} timeout.", "peringatan")
             continue
 
+    # Semua player MP3 gagal — biarkan _bicara_internal pakai Termux TTS
     if not _mpv_missing_logged:
         _mpv_missing_logged = True
         tampilkan_status(
-            "Tidak ada audio player! Suara tidak keluar.\n"
-            "  Install: pkg install mpv",
-            "error"
+            "mpv/ffplay tidak bisa memutar audio → pakai Termux TTS sebagai fallback.",
+            "peringatan"
         )
     return False
 
@@ -186,14 +190,16 @@ def _bicara_internal(teks_bersih: str) -> None:
 
     # ── PRIORITAS 2: Termux TTS (blocking, offline) ────────
     try:
+        tampilkan_status("Bicara via Termux TTS...", "info")
         ret = subprocess.run(
             ["termux-tts-speak", teks_bersih],
             capture_output=True, timeout=60
         )
         if ret.returncode == 0:
+            tampilkan_status("Audio selesai via Termux TTS.", "info")
             return
     except FileNotFoundError:
-        pass
+        tampilkan_status("termux-tts-speak tidak ada. Install: pkg install termux-api", "error")
     except subprocess.TimeoutExpired:
         tampilkan_status("Termux TTS timeout.", "peringatan")
 
