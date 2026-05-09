@@ -110,9 +110,14 @@ else
     log_sukses "config.py sudah ada."
 fi
 
-if [ ! -f ".env" ] && [ -f ".env.example" ]; then
-    cp .env.example .env
-    log_warning ".env dibuat dari template. Edit dan isi API key Anda."
+# PENTING: JANGAN auto-copy .env.example → .env
+# File .env akan menimpa config.py via load_dotenv() — kalau berisi
+# placeholder ("192.168.x.x", "your_gemini_api_key_here", "NamaMu"),
+# semua perbaikan di config.py akan PERCUMA.
+# User cukup edit config.py saja (atau jalankan setup_config.sh).
+if [ -f ".env" ]; then
+    log_warning ".env terdeteksi — akan menimpa config.py!"
+    log_warning "Kalau .env berisi placeholder, hapus: rm .env"
 fi
 
 # ── 7. Buat folder yang diperlukan ────────────────────────────

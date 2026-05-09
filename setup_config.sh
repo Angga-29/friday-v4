@@ -207,6 +207,14 @@ fi
 
 log_ok "config.py berhasil dibuat!"
 
+# ── Hapus .env agar tidak menimpa config.py ───────────────────
+# load_dotenv() di config.py akan baca .env DULU — kalau .env berisi
+# placeholder lama, config.py jadi tidak terpakai. Jadi kita hapus saja.
+if [ -f ".env" ]; then
+    rm -f .env
+    log_warn ".env dihapus (agar config.py jadi sumber utama)"
+fi
+
 # ── Cek dan install mpv ───────────────────────────────────────
 echo ""
 log_info "Mengecek audio player (mpv)..."
