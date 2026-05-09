@@ -105,15 +105,9 @@ def ambil_frame(url_kamera: str) -> np.ndarray | None:
 def inisialisasi_kamera(url_kamera: str) -> np.ndarray | None:
     """
     Menghubungkan ke kamera dengan retry otomatis.
-    Jika URL utama gagal, coba endpoint IPWebcam lainnya secara otomatis.
-
-    Args:
-        url_kamera: URL endpoint kamera dari config.py
-
-    Returns:
-        Frame pertama yang berhasil diambil, atau None jika semua percobaan gagal.
+    Jika URL utama gagal, coba endpoint IPWebcam lainnya + multi base URL.
     """
-    tampilkan_status("Menghubungkan ke IP Webcam...", "info")
+    tampilkan_status(f"Menghubungkan ke kamera: {url_kamera}", "info")
 
     # Coba URL yang diberikan terlebih dahulu
     for percobaan in range(1, MAX_RETRY + 1):
@@ -130,7 +124,7 @@ def inisialisasi_kamera(url_kamera: str) -> np.ndarray | None:
         )
         time.sleep(RETRY_DELAY)
 
-    # Fallback: coba endpoint alternatif IPWebcam
+    # Fallback 1: coba endpoint alternatif di base URL yang sama
     tampilkan_status("Mencoba endpoint IPWebcam alternatif...", "info")
     base_url = _ekstrak_base_url(url_kamera)
     url_aktif = temukan_endpoint_aktif(base_url)
@@ -142,12 +136,35 @@ def inisialisasi_kamera(url_kamera: str) -> np.ndarray | None:
         )
         return ambil_frame(url_aktif)
 
+    # Fallback 2: jika user pakai 127.0.0.1, coba juga IP umum lainnya
+    if "127.0.0.1" in url_kamera or "localhost" in url_kamera:
+        tampilkan_status(
+            "URL pakai localhost — coba juga IP WiFi tablet...", "info"
+        )
+        ip_alternatif = ["192.168.1.1", "192.168.0.1", "10.0.0.1"]
+        for ip in ip_alternatif:
+            url_coba = f"http://{ip}:8080/shot.jpg"
+            try:
+                resp = requests.get(url_coba, timeout=2)
+                if resp.status_code == 200 and len(resp.content) > 1000:
+                    tampilkan_status(
+                        f"Endpoint aktif: {url_coba}\n"
+                        f"  Update config.py: URL_KAMERA = \"{url_coba}\"",
+                        "sukses"
+                    )
+                    return ambil_frame(url_coba)
+            except Exception:
+                continue
+
     tampilkan_status(
         "Tidak dapat terhubung ke kamera.\n"
-        "Pastikan:\n"
-        "  1. Aplikasi IPWebcam sudah dibuka dan Start server\n"
-        "  2. HP dan Xiaomi Pad 7 di WiFi yang sama\n"
-        "  3. URL_KAMERA di config.py / .env sudah benar",
+        "Cek poin berikut:\n"
+        "  1. Aplikasi IP Webcam sudah Start server (lampu hijau aktif)\n"
+        "  2. URL_KAMERA di config.py sesuai dengan yang ditampilkan IP Webcam\n"
+        "  3. Jika IP Webcam di tablet sama → coba: http://127.0.0.1:8080/shot.jpg\n"
+        "  4. Jika IP Webcam di HP lain → pastikan WiFi sama + isi IP HP\n"
+        "  5. Coba buka URL di browser dulu untuk test\n"
+        "Friday akan jalan dalam mode SUARA SAJA.",
         "error"
     )
     return None

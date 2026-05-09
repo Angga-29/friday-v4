@@ -31,13 +31,19 @@ _TMPDIR    = os.environ.get("TMPDIR") or os.path.dirname(os.path.abspath(__file_
 TEMP_AUDIO = os.path.join(_TMPDIR, "friday_voice.mp3")
 
 # ── Flag anti-echo — dibaca oleh wake_word.py dan pendengar.py ──
-_sedang_bicara   = threading.Event()
+_sedang_bicara      = threading.Event()
 _mpv_missing_logged = False
+_teks_terakhir      = ""   # teks terakhir yang diucapkan Friday
 
 
 def sedang_bicara() -> bool:
     """Return True saat Friday sedang memutar audio TTS."""
     return _sedang_bicara.is_set()
+
+
+def teks_terakhir_diucapkan() -> str:
+    """Return teks terakhir yang diucapkan Friday — untuk deteksi echo."""
+    return _teks_terakhir
 
 
 def _bersihkan_teks(teks: str) -> str:
@@ -96,10 +102,14 @@ def _putar_audio(file_path: str) -> bool:
 
 def bicara(teks: str) -> None:
     """Friday berbicara — set flag anti-echo sebelum dan setelah audio."""
+    global _teks_terakhir
     tampilkan_friday_bicara(teks)
     teks_bersih = _bersihkan_teks(teks)
     if not teks_bersih:
         return
+
+    # Simpan teks untuk deteksi echo nanti di pendengar
+    _teks_terakhir = teks_bersih.lower()
 
     # ── Aktifkan flag: mikrofon tidak boleh merekam ─────────
     _sedang_bicara.set()
@@ -107,9 +117,9 @@ def bicara(teks: str) -> None:
     try:
         _bicara_internal(teks_bersih)
     finally:
-        # ── Jeda tambahan setelah audio selesai ────────────
+        # ── Jeda lebih panjang setelah audio selesai ───────
         # Memberi waktu gema/reverb di ruangan untuk hilang
-        time.sleep(1.5)
+        time.sleep(2.0)
         _sedang_bicara.clear()
 
 
