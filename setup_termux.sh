@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # ==============================================================
-#   setup_termux.sh — Project Friday v3.0.0
+#   setup_termux.sh — Project Friday v4.0.0
 #   Auto-setup untuk Termux di Android (Xiaomi Pad 7)
 #
 #   CARA PAKAI:
@@ -8,22 +8,20 @@
 #     bash setup_termux.sh
 # ==============================================================
 
-# set -e dihapus agar error satu package tidak menghentikan seluruh setup
-
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
-NC='\033[0m'   # No Color
+NC='\033[0m'
 
 log_info()    { echo -e "${CYAN}[•] $1${NC}"; }
 log_sukses()  { echo -e "${GREEN}[✓] $1${NC}"; }
 log_warning() { echo -e "${YELLOW}[!] $1${NC}"; }
-log_error()   { echo -e "${RED}[✗] $1${NC}"; exit 1; }
+log_error()   { echo -e "${RED}[✗] $1${NC}"; }
 
 echo -e "${CYAN}"
 echo "╔══════════════════════════════════════════════════════╗"
-echo "║        FRIDAY AI — Termux Setup Script               ║"
+echo "║        FRIDAY AI v4.0 — Termux Setup Script          ║"
 echo "║        Platform: Android (Xiaomi Pad 7)              ║"
 echo "╚══════════════════════════════════════════════════════╝"
 echo -e "${NC}"
@@ -37,48 +35,62 @@ log_info "Update repository Termux..."
 pkg update -y 2>/dev/null || log_warning "Update gagal, lanjut..."
 
 # ── 3. Install package sistem ─────────────────────────────────
-log_info "Install package sistem..."
+log_info "Install package sistem Termux..."
 
-PACKAGES=(
-    python          # Python 3
-    python-pip      # Package manager Python
-    mpv             # Player audio (untuk Edge-TTS)
-    ffmpeg          # Multimedia tools (fallback audio)
-    portaudio       # Library audio (wajib untuk PyAudio)
-    libsndfile      # Library audio support
-    flac            # WAJIB untuk SpeechRecognition — konversi audio ke FLAC
-    clang           # Compiler (dibutuhkan beberapa package Python)
-    cmake           # Build tools
-    pkg-config      # Build config tools
+SYS_PACKAGES=(
+    "python"          # Python 3
+    "python-pip"      # Package manager Python
+    "python-opencv"   # OpenCV untuk Android ARM (WAJIB — pip tidak bisa!)
+    "mpv"             # Player audio utama (untuk Edge-TTS)
+    "ffmpeg"          # Multimedia tools (fallback audio)
+    "portaudio"       # Library audio (wajib untuk PyAudio)
+    "libsndfile"      # Library audio support
+    "flac"            # WAJIB untuk SpeechRecognition (konversi audio)
+    "clang"           # Compiler (dibutuhkan beberapa package Python)
+    "cmake"           # Build tools
+    "pkg-config"      # Build config tools
+    "termux-api"      # Untuk mikrofon & TTS Termux
 )
 
-for pkg in "${PACKAGES[@]}"; do
-    log_info "  Install: $pkg"
-    pkg install -y "$pkg" 2>/dev/null || log_warning "  $pkg gagal, mungkin sudah terinstall"
+for p in "${SYS_PACKAGES[@]}"; do
+    log_info "  Install: $p"
+    pkg install -y "$p" 2>/dev/null && log_sukses "  $p OK" || log_warning "  $p gagal (mungkin sudah ada)"
 done
 
 log_sukses "Package sistem selesai."
 
 # ── 4. Upgrade pip ────────────────────────────────────────────
 log_info "Upgrade pip..."
-pip install --upgrade pip --quiet
+pip install --upgrade pip --quiet 2>/dev/null
 
-# ── 5. Install Python packages ────────────────────────────────
-log_info "Install Python packages dari requirements.txt..."
+# ── 5. Install Python packages (TANPA opencv) ─────────────────
+log_info "Install Python packages..."
+log_warning "OpenCV di-skip (sudah diinstall via pkg install python-opencv)"
 
-if [ ! -f "requirements.txt" ]; then
-    log_error "File requirements.txt tidak ditemukan! Jalankan dari folder friday-v3/"
-fi
+PY_PACKAGES=(
+    "requests>=2.31.0"
+    "google-generativeai>=0.8.0"
+    "edge-tts>=6.1.0"
+    "gTTS>=2.4.0"
+    "SpeechRecognition>=3.10.0"
+    "ddgs>=0.6.0"
+    "colorama>=0.4.6"
+    "python-dotenv>=1.0.0"
+    "numpy>=1.24.0"
+)
 
-# Install satu per satu agar error satu package tidak menghentikan semua
-while IFS= read -r line; do
-    # Skip baris komentar dan kosong
-    [[ "$line" =~ ^#.*$ ]] && continue
-    [[ -z "$line" ]] && continue
+for pkg_py in "${PY_PACKAGES[@]}"; do
+    log_info "  pip install: $pkg_py"
+    pip install "$pkg_py" --quiet 2>/dev/null && \
+        log_sukses "  OK: $pkg_py" || \
+        log_warning "  Gagal: $pkg_py"
+done
 
-    log_info "  pip install: $line"
-    pip install "$line" --quiet 2>/dev/null || log_warning "  Gagal install: $line"
-done < requirements.txt
+# Install PyAudio (perlu portaudio sudah terinstall)
+log_info "  pip install: PyAudio (perlu portaudio)"
+pip install PyAudio --quiet 2>/dev/null && \
+    log_sukses "  OK: PyAudio" || \
+    log_warning "  PyAudio gagal — coba: pip install pyaudio"
 
 log_sukses "Python packages selesai."
 
@@ -90,8 +102,9 @@ if [ ! -f "config.py" ]; then
         cp config.example.py config.py
         log_warning "config.py dibuat dari template."
         log_warning "EDIT config.py dan masukkan API key Anda!"
+        log_warning "  nano config.py"
     else
-        log_error "config.example.py tidak ditemukan!"
+        log_error "config.example.py tidak ditemukan! Jalankan dari folder friday-v4/"
     fi
 else
     log_sukses "config.py sudah ada."
@@ -105,30 +118,42 @@ fi
 # ── 7. Buat folder yang diperlukan ────────────────────────────
 log_info "Membuat folder data..."
 mkdir -p data/wajah_dikenal
-mkdir -p /tmp
 
 log_sukses "Folder data siap."
 
-# ── 8. Test microphone ────────────────────────────────────────
-log_info "Cek izin microphone Termux..."
-if command -v termux-microphone-record &>/dev/null; then
-    log_sukses "Termux API tersedia (microphone)."
-else
-    log_warning "termux-api tidak terinstall."
-    log_warning "Install dari Play Store: Termux:API"
-    log_warning "Lalu jalankan: pkg install termux-api"
-fi
+# ── 8. Test komponen ──────────────────────────────────────────
+log_info "Verifikasi komponen..."
+echo ""
 
-# ── 9. Test audio player ──────────────────────────────────────
-log_info "Cek audio player..."
-if command -v mpv &>/dev/null; then
-    log_sukses "mpv tersedia (audio player utama)."
-elif command -v ffplay &>/dev/null; then
-    log_sukses "ffplay tersedia (audio player fallback)."
-else
-    log_warning "Tidak ada audio player terdeteksi!"
-    log_warning "Jalankan: pkg install mpv"
-fi
+check_py() {
+    python3 -c "import $1" 2>/dev/null && \
+        log_sukses "  Python: $1" || \
+        log_warning "  Python: $1 — BELUM TERINSTALL"
+}
+
+check_cmd_tool() {
+    command -v "$1" &>/dev/null && \
+        log_sukses "  Tool: $1" || \
+        log_warning "  Tool: $1 — tidak ditemukan"
+}
+
+echo "  [ Python Packages ]"
+check_py "cv2"
+check_py "google.generativeai"
+check_py "speech_recognition"
+check_py "edge_tts"
+check_py "gtts"
+check_py "requests"
+check_py "colorama"
+check_py "dotenv"
+check_py "ddgs"
+
+echo ""
+echo "  [ System Tools ]"
+check_cmd_tool "flac"
+check_cmd_tool "mpv"
+check_cmd_tool "ffmpeg"
+check_cmd_tool "python3"
 
 # ── Selesai ───────────────────────────────────────────────────
 echo ""
@@ -137,17 +162,22 @@ echo "║                  SETUP SELESAI!                      ║"
 echo "╚══════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${YELLOW}Langkah selanjutnya:${NC}"
-echo "  1. Edit config.py dan masukkan API key Anda"
+echo ""
+echo "  1. Edit config.py dan masukkan API key Anda:"
 echo "     nano config.py"
 echo ""
-echo "  2. Set URL IP Webcam (IP Android yang menjalankan IPWebcam)"
+echo "  2. Set URL IP Webcam (atau biarkan jika mau mode suara saja):"
 echo "     URL_KAMERA = \"http://<IP_ANDROID>:8080/shot.jpg\""
+echo "     KAMERA_WAJIB = False   ← agar tetap jalan walau kamera gagal"
 echo ""
-echo "  3. Tambahkan foto wajah (opsional)"
+echo "  3. Tambahkan foto wajah untuk pengenalan (opsional):"
 echo "     mkdir data/wajah_dikenal/NamaAnda"
 echo "     cp foto*.jpg data/wajah_dikenal/NamaAnda/"
 echo ""
 echo "  4. Jalankan Friday!"
 echo "     bash start.sh"
 echo "     # atau: python main.py"
+echo ""
+echo -e "${CYAN}Jika ada error saat pertama jalan:${NC}"
+echo "     bash fix_errors.sh"
 echo ""

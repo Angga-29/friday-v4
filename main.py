@@ -34,11 +34,8 @@ from modules.tampilan    import (
     pop_up_berita, tampilkan_browsing, tampilkan_vision,
     tampilkan_statistik
 )
-from modules.kamera      import ambil_frame, inisialisasi_kamera, ke_grayscale_blur
 from modules.suara       import bicara
 from modules.pendengar   import dengarkan
-from modules.wajah       import PengenalWajah
-from modules.gerak       import deteksi_gerakan
 from modules.info        import dapatkan_waktu, dapatkan_cuaca, dapatkan_berita
 from modules.gemini_ai   import GeminiAI
 from modules.browser     import perlu_browsing, cari_web, format_untuk_gemini
@@ -48,6 +45,30 @@ from modules.penglihatan import perlu_penglihatan, deskripsikan_pemandangan
 from modules.proaktif    import ModeProaktif
 from modules.riset       import perlu_riset, riset_mendalam
 from skills              import SkillManager
+
+# Import modul kamera & wajah — opsional (tidak crash jika tidak tersedia)
+try:
+    from modules.kamera import ambil_frame, inisialisasi_kamera, ke_grayscale_blur
+    _KAMERA_TERSEDIA = True
+except ImportError as _e:
+    tampilkan_status = None  # akan di-set ulang setelah import tampilkan
+    _KAMERA_TERSEDIA = False
+    _KAMERA_IMPORT_ERROR = str(_e)
+
+try:
+    from modules.wajah import PengenalWajah
+    _WAJAH_TERSEDIA = True
+except ImportError:
+    _WAJAH_TERSEDIA = False
+
+try:
+    from modules.gerak import deteksi_gerakan
+    _GERAK_TERSEDIA = True
+except ImportError:
+    _GERAK_TERSEDIA = False
+
+# Re-import tampilkan_status karena mungkin ditimpa sementara
+from modules.tampilan import tampilkan_status
 
 
 # ==============================================================
@@ -63,14 +84,15 @@ COOLDOWN_GERAK    = 30
 # STATE GLOBAL — diakses dari thread wake word
 # ==============================================================
 state = {
-    "wake_triggered" : False,
-    "ai"             : None,
-    "memori"         : None,
-    "skill_manager"  : None,
-    "frame_terakhir" : None,
-    "cache_waktu"    : "",
-    "cache_cuaca"    : "",
-    "cache_berita"   : [],
+    "wake_triggered"  : False,
+    "ai"              : None,
+    "memori"          : None,
+    "skill_manager"   : None,
+    "frame_terakhir"  : None,
+    "cache_waktu"     : "",
+    "cache_cuaca"     : "",
+    "cache_berita"    : [],
+    "tanpa_kamera"    : False,   # True = mode suara saja
 }
 
 
@@ -93,18 +115,43 @@ def inisialisasi_semua():
     memori = MemoriFriday()
     state["memori"] = memori
 
-    # 2. Kamera
-    frame_awal = inisialisasi_kamera(config.URL_KAMERA)
-    if frame_awal is None:
-        tampilkan_status("Kamera tidak terhubung!", "error")
-        sys.exit(1)
+    # 2. Kamera (opsional — tidak crash jika tidak tersedia)
+    kamera_wajib = getattr(config, 'KAMERA_WAJIB', False)
+    pengenal     = None
 
-    # 3. Pengenal Wajah
-    try:
-        pengenal = PengenalWajah()
-    except Exception as e:
-        tampilkan_status(str(e), "error")
-        sys.exit(1)
+    if not _KAMERA_TERSEDIA:
+        tampilkan_status(
+            f"Modul kamera tidak dapat dimuat: {_KAMERA_IMPORT_ERROR if not _KAMERA_TERSEDIA else ''}",
+            "peringatan"
+        )
+        tampilkan_status("Pastikan OpenCV terinstall: pkg install python-opencv", "info")
+        if kamera_wajib:
+            sys.exit(1)
+        state["tanpa_kamera"] = True
+    else:
+        frame_awal = inisialisasi_kamera(config.URL_KAMERA)
+        if frame_awal is None:
+            if kamera_wajib:
+                tampilkan_status(
+                    "Kamera tidak terhubung! Set KAMERA_WAJIB=False di config.py "
+                    "untuk mode suara saja.", "error"
+                )
+                sys.exit(1)
+            tampilkan_status("Kamera tidak tersedia → MODE SUARA SAJA aktif.", "peringatan")
+            state["tanpa_kamera"] = True
+        else:
+            state["tanpa_kamera"] = False
+
+    # 3. Pengenal Wajah (opsional)
+    if not state["tanpa_kamera"] and _WAJAH_TERSEDIA:
+        try:
+            pengenal = PengenalWajah()
+        except Exception as e:
+            tampilkan_status(f"Pengenalan wajah: {e}", "peringatan")
+            tampilkan_status("Berjalan tanpa pengenalan wajah (deteksi wajah tetap aktif).", "info")
+            pengenal = None
+    elif not _WAJAH_TERSEDIA:
+        tampilkan_status("Modul wajah tidak tersedia (install opencv-contrib).", "peringatan")
 
     # 4. Gemini AI dengan memori
     ai = GeminiAI(
@@ -149,6 +196,11 @@ def inisialisasi_semua():
     tampilkan_divider()
     tampilkan_status("Friday v4.0 siap bertugas!", "sukses")
     time.sleep(1)
+
+    if state["tanpa_kamera"]:
+        tampilkan_status(
+            "MODE SUARA SAJA: Panggil 'Hai Friday' untuk mulai berbicara.", "info"
+        )
 
     return ai, pengenal, memori, wake_detector, proaktif, skill_manager
 
@@ -287,105 +339,133 @@ def jalankan():
     tampilkan_status("Loop utama aktif. Tekan Ctrl+C untuk keluar.", "sukses")
 
     try:
-        while True:
+        if state["tanpa_kamera"]:
+            # ══════════════════════════════════════════════════
+            # LOOP MODE SUARA SAJA (tanpa kamera / IP Webcam)
+            # ══════════════════════════════════════════════════
+            tampilkan_status("Loop suara aktif. Panggil 'Hai Friday' kapan saja.", "sukses")
+            while True:
+                if state["wake_triggered"]:
+                    state["wake_triggered"] = False
+                    tampilkan_status("Wake word terpicu — masuk mode listen.", "wake")
+                    bicara("Ya, Bos. Saya mendengarkan.")
 
-            # ── 1. AMBIL FRAME ───────────────────────────────────
-            frame = ambil_frame(config.URL_KAMERA)
-            if frame is None:
-                time.sleep(1)
-                continue
+                    if not state["cache_cuaca"]:
+                        update_cache_data()
 
-            state["frame_terakhir"] = frame
-            frame_gray = ke_grayscale_blur(frame)
-            waktu_kini = time.time()
-
-            # ── 2. CEK WAKE WORD ─────────────────────────────────
-            if state["wake_triggered"]:
-                state["wake_triggered"] = False
-                tampilkan_status("Wake word terpicu — masuk mode listen.", "wake")
-                bicara("Ya, Bos. Saya mendengarkan.")
-
-                if not state["cache_cuaca"]:
-                    update_cache_data()
-
-                suara_user = dengarkan(setelah_tts=True)
-                if suara_user:
-                    if proses_jawaban(suara_user, ai, memori, skill_manager):
-                        break
-                else:
-                    bicara("Maaf, saya tidak mendengar.")
-                continue
-
-            # ── 3. DETEKSI GERAKAN ───────────────────────────────
-            if frame_lama_gray is not None:
-                ada_gerak, _ = deteksi_gerakan(frame_lama_gray, frame_gray)
-                if ada_gerak:
-                    waktu_gerak_terakhir = waktu_kini
-                    if waktu_kini - waktu_terakhir_gerak > COOLDOWN_GERAK:
-                        tampilkan_status("Gerakan terdeteksi.", "deteksi")
-                        if not state["cache_cuaca"]:
-                            state["cache_cuaca"] = dapatkan_cuaca(
-                                config.API_KEY_CUACA, config.KOTA_CUACA
-                            )
-                        bicara(f"Peringatan, gerakan terdeteksi. {state['cache_cuaca']}")
-                        waktu_terakhir_gerak = waktu_kini
-
-            frame_lama_gray = frame_gray
-
-            # ── 4. DETEKSI & IDENTIFIKASI WAJAH ──────────────────
-            wajah_list   = pengenal.deteksi(frame)
-            ada_orang    = len(wajah_list) > 0
-            nama_dikenal = None
-
-            for (x, y, w, h, nama, conf) in wajah_list:
-                if nama != "Tidak Dikenal":
-                    nama_dikenal = nama
-                    break
-
-            if not ada_orang and waktu_gerak_terakhir > 0:
-                if waktu_kini - waktu_gerak_terakhir < 10:
-                    ada_orang = True
-
-            if ada_orang:
-                # ── 5. SAPAAN PERSONAL ───────────────────────────
-                if not sudah_menyapa or waktu_kini - waktu_terakhir_sapaan > COOLDOWN_SAPAAN:
-                    sudah_menyapa         = True
-                    waktu_terakhir_sapaan = waktu_kini
-
-                    update_cache_data()
-                    pop_up_berita(state["cache_berita"])
-
-                    if nama_dikenal:
-                        bicara(f"Halo, {nama_dikenal}! {state['cache_waktu']}")
-                        memori.catat_interaksi("wajah")
+                    suara_user = dengarkan(setelah_tts=True)
+                    if suara_user:
+                        if proses_jawaban(suara_user, ai, memori, skill_manager):
+                            break
                     else:
-                        bicara(f"Halo, Bos {config.NAMA_PENGGUNA}! {state['cache_waktu']}")
-
-                    time.sleep(0.4)
-                    bicara(f"Laporan cuaca. {state['cache_cuaca']}")
-                    time.sleep(0.4)
-                    bicara(
-                        "Saya siap membantu. Bisa bertanya apa saja, "
-                        "atau panggil saya dengan hai Friday."
-                    )
-
-                # ── 6. DENGARKAN ─────────────────────────────────
-                suara_user = dengarkan(setelah_tts=True)
-                if suara_user:
-                    if proses_jawaban(suara_user, ai, memori, skill_manager):
-                        break
-                    time.sleep(1)
+                        bicara("Maaf, saya tidak mendengar.")
                 else:
-                    bicara("Maaf, saya tidak mendengar. Silakan ulangi.")
+                    time.sleep(DELAY_UTAMA)
 
-            else:
-                if sudah_menyapa and waktu_kini - waktu_terakhir_sapaan > COOLDOWN_SAPAAN:
-                    sudah_menyapa = False
-                    tampilkan_status("Area kosong. Mode standby.", "info")
-                time.sleep(DELAY_TANPA_ORANG)
-                continue
+        else:
+            # ══════════════════════════════════════════════════
+            # LOOP MODE PENUH (dengan kamera + deteksi wajah)
+            # ══════════════════════════════════════════════════
+            while True:
 
-            time.sleep(DELAY_UTAMA)
+                # ── 1. AMBIL FRAME ───────────────────────────────────
+                frame = ambil_frame(config.URL_KAMERA)
+                if frame is None:
+                    time.sleep(1)
+                    continue
+
+                state["frame_terakhir"] = frame
+                frame_gray = ke_grayscale_blur(frame) if _KAMERA_TERSEDIA else None
+                waktu_kini = time.time()
+
+                # ── 2. CEK WAKE WORD ─────────────────────────────────
+                if state["wake_triggered"]:
+                    state["wake_triggered"] = False
+                    tampilkan_status("Wake word terpicu — masuk mode listen.", "wake")
+                    bicara("Ya, Bos. Saya mendengarkan.")
+
+                    if not state["cache_cuaca"]:
+                        update_cache_data()
+
+                    suara_user = dengarkan(setelah_tts=True)
+                    if suara_user:
+                        if proses_jawaban(suara_user, ai, memori, skill_manager):
+                            break
+                    else:
+                        bicara("Maaf, saya tidak mendengar.")
+                    continue
+
+                # ── 3. DETEKSI GERAKAN ───────────────────────────────
+                if _GERAK_TERSEDIA and frame_gray is not None and frame_lama_gray is not None:
+                    ada_gerak, _ = deteksi_gerakan(frame_lama_gray, frame_gray)
+                    if ada_gerak:
+                        waktu_gerak_terakhir = waktu_kini
+                        if waktu_kini - waktu_terakhir_gerak > COOLDOWN_GERAK:
+                            tampilkan_status("Gerakan terdeteksi.", "deteksi")
+                            if not state["cache_cuaca"]:
+                                state["cache_cuaca"] = dapatkan_cuaca(
+                                    config.API_KEY_CUACA, config.KOTA_CUACA
+                                )
+                            bicara(f"Peringatan, gerakan terdeteksi. {state['cache_cuaca']}")
+                            waktu_terakhir_gerak = waktu_kini
+
+                if frame_gray is not None:
+                    frame_lama_gray = frame_gray
+
+                # ── 4. DETEKSI & IDENTIFIKASI WAJAH ──────────────────
+                wajah_list   = pengenal.deteksi(frame) if pengenal else []
+                ada_orang    = len(wajah_list) > 0
+                nama_dikenal = None
+
+                for (x, y, w, h, nama, conf) in wajah_list:
+                    if nama != "Tidak Dikenal":
+                        nama_dikenal = nama
+                        break
+
+                if not ada_orang and waktu_gerak_terakhir > 0:
+                    if waktu_kini - waktu_gerak_terakhir < 10:
+                        ada_orang = True
+
+                if ada_orang:
+                    # ── 5. SAPAAN PERSONAL ───────────────────────────
+                    if not sudah_menyapa or waktu_kini - waktu_terakhir_sapaan > COOLDOWN_SAPAAN:
+                        sudah_menyapa         = True
+                        waktu_terakhir_sapaan = waktu_kini
+
+                        update_cache_data()
+                        pop_up_berita(state["cache_berita"])
+
+                        if nama_dikenal:
+                            bicara(f"Halo, {nama_dikenal}! {state['cache_waktu']}")
+                            memori.catat_interaksi("wajah")
+                        else:
+                            bicara(f"Halo, Bos {config.NAMA_PENGGUNA}! {state['cache_waktu']}")
+
+                        time.sleep(0.4)
+                        bicara(f"Laporan cuaca. {state['cache_cuaca']}")
+                        time.sleep(0.4)
+                        bicara(
+                            "Saya siap membantu. Bisa bertanya apa saja, "
+                            "atau panggil saya dengan hai Friday."
+                        )
+
+                    # ── 6. DENGARKAN ─────────────────────────────────
+                    suara_user = dengarkan(setelah_tts=True)
+                    if suara_user:
+                        if proses_jawaban(suara_user, ai, memori, skill_manager):
+                            break
+                        time.sleep(1)
+                    else:
+                        bicara("Maaf, saya tidak mendengar. Silakan ulangi.")
+
+                else:
+                    if sudah_menyapa and waktu_kini - waktu_terakhir_sapaan > COOLDOWN_SAPAAN:
+                        sudah_menyapa = False
+                        tampilkan_status("Area kosong. Mode standby.", "info")
+                    time.sleep(DELAY_TANPA_ORANG)
+                    continue
+
+                time.sleep(DELAY_UTAMA)
 
     except KeyboardInterrupt:
         tampilkan_divider()

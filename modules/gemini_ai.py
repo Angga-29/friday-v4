@@ -1,13 +1,28 @@
 # ==============================================================
-# modules/gemini_ai.py — Project Friday | Gemini AI v3.0
-# Versi : 3.0.0 — Integrasi dengan memori permanen
+# modules/gemini_ai.py — Project Friday | Gemini AI v4.0
+# Versi : 4.0.0 — Support Gemini 2.5 Flash + dual SDK fallback
 # ==============================================================
 
-import google.generativeai as genai
 from modules.tampilan import tampilkan_status, tampilkan_memproses
 
-MODEL_NAME = "gemini-2.5-flash"
-MAX_TOKENS = 500
+MODEL_UTAMA   = "gemini-2.5-flash"
+MODEL_FALLBACK = "gemini-1.5-flash"
+MAX_TOKENS    = 500
+
+# Deteksi SDK yang tersedia: google-generativeai (lama) atau google-genai (baru)
+_SDK_MODE = None
+genai     = None
+
+try:
+    import google.generativeai as genai
+    _SDK_MODE = "generativeai"
+except ImportError:
+    try:
+        from google import genai as _g
+        genai = _g
+        _SDK_MODE = "genai"
+    except ImportError:
+        pass
 
 
 class GeminiAI:
@@ -16,41 +31,120 @@ class GeminiAI:
         self.model         = None
         self.chat          = None
         self.system_prompt = system_prompt
-        self.memori        = memori   # Optional: MemoriFriday instance
+        self.memori        = memori
+        self._api_key      = api_key
 
+        if _SDK_MODE is None:
+            tampilkan_status(
+                "google-generativeai tidak terinstall!\n"
+                "Jalankan: pip install google-generativeai",
+                "error"
+            )
+            return
+
+        if _SDK_MODE == "generativeai":
+            self._init_generativeai(api_key, system_prompt)
+        else:
+            self._init_genai(api_key, system_prompt)
+
+    def _init_generativeai(self, api_key: str, system_prompt: str):
+        """Inisialisasi dengan SDK google-generativeai (legacy)."""
         try:
             genai.configure(api_key=api_key)
-            # Inject memori ke system prompt jika tersedia
-            full_system = system_prompt
-            if memori:
-                konteks_memori = self._bangun_konteks_memori()
-                if konteks_memori:
-                    full_system = system_prompt + "\n\n" + konteks_memori
+            full_system = self._bangun_system_prompt(system_prompt)
 
-            self.model = genai.GenerativeModel(
-                model_name=MODEL_NAME,
-                system_instruction=full_system,
-                generation_config=genai.GenerationConfig(
-                    max_output_tokens=MAX_TOKENS,
-                    temperature=0.75,
-                    top_p=0.95,
+            # Coba model utama (Gemini 2.5 Flash)
+            self.model = self._buat_model_generativeai(full_system, MODEL_UTAMA)
+            if self.model is None:
+                # Fallback ke Gemini 1.5 Flash
+                tampilkan_status(
+                    f"Gagal load {MODEL_UTAMA}, mencoba {MODEL_FALLBACK}...", "peringatan"
                 )
-            )
-            self.chat = self.model.start_chat(history=[])
-            self._terhubung = True
-            tampilkan_status(f"Gemini AI ({MODEL_NAME}) berhasil dimuat.", "sukses")
+                self.model = self._buat_model_generativeai(full_system, MODEL_FALLBACK)
+
+            if self.model:
+                self.chat       = self.model.start_chat(history=[])
+                self._terhubung = True
+                tampilkan_status(
+                    f"Gemini AI siap (SDK: generativeai).", "sukses"
+                )
+            else:
+                tampilkan_status("Gagal inisialisasi Gemini AI.", "error")
 
         except Exception as e:
             tampilkan_status(f"Gagal init Gemini AI: {e}", "error")
 
+    def _buat_model_generativeai(self, system_prompt: str, model_name: str):
+        """Buat GenerativeModel dengan penanganan thinking config Gemini 2.5."""
+        try:
+            # Konfigurasi dasar — kompatibel semua versi
+            gen_config = {
+                "max_output_tokens": MAX_TOKENS,
+                "temperature"      : 0.75,
+                "top_p"            : 0.95,
+            }
+
+            # Gemini 2.5 Flash punya "thinking" — nonaktifkan untuk kecepatan
+            if "2.5" in model_name:
+                try:
+                    gen_config["thinking_config"] = {"thinking_budget": 0}
+                except Exception:
+                    pass
+
+            model = genai.GenerativeModel(
+                model_name=model_name,
+                system_instruction=system_prompt,
+                generation_config=gen_config,
+            )
+            # Test koneksi
+            model.start_chat(history=[])
+            tampilkan_status(f"Model {model_name} dimuat.", "sukses")
+            return model
+
+        except Exception as e:
+            err = str(e)
+            if "thinking_config" in err or "thinking" in err.lower():
+                # Retry tanpa thinking_config
+                try:
+                    gen_config.pop("thinking_config", None)
+                    model = genai.GenerativeModel(
+                        model_name=model_name,
+                        system_instruction=system_prompt,
+                        generation_config=gen_config,
+                    )
+                    model.start_chat(history=[])
+                    tampilkan_status(f"Model {model_name} dimuat (tanpa thinking_config).", "sukses")
+                    return model
+                except Exception as e2:
+                    tampilkan_status(f"Gagal load {model_name}: {e2}", "peringatan")
+                    return None
+            tampilkan_status(f"Gagal load {model_name}: {e}", "peringatan")
+            return None
+
+    def _init_genai(self, api_key: str, system_prompt: str):
+        """Inisialisasi dengan SDK google-genai (baru)."""
+        try:
+            self._client    = genai.Client(api_key=api_key)
+            self._model_name = MODEL_UTAMA
+            full_system     = self._bangun_system_prompt(system_prompt)
+            self._system    = full_system
+            self._history   = []
+            self._terhubung = True
+            tampilkan_status("Gemini AI siap (SDK: google-genai).", "sukses")
+        except Exception as e:
+            tampilkan_status(f"Gagal init Gemini (genai SDK): {e}", "error")
+
+    def _bangun_system_prompt(self, base: str) -> str:
+        """Gabungkan system prompt dengan konteks memori."""
+        if not self.memori:
+            return base
+        konteks = self._bangun_konteks_memori()
+        return base + ("\n\n" + konteks if konteks else "")
+
     def _bangun_konteks_memori(self) -> str:
-        """Bangun konteks dari memori untuk diberikan ke Gemini."""
         if not self.memori:
             return ""
-
         bagian = []
-
-        # Preferensi pengguna
         try:
             cur = self.memori.koneksi.cursor()
             cur.execute("SELECT kunci, nilai FROM preferensi LIMIT 10")
@@ -62,12 +156,11 @@ class GeminiAI:
         except Exception:
             pass
 
-        # Percakapan terakhir (5 terakhir)
         riwayat = self.memori.ambil_percakapan_terakhir(5)
         if riwayat:
             bagian.append("\n[PERCAKAPAN TERAKHIR — UNTUK KONTEKS]")
             for user, friday in riwayat:
-                bagian.append(f"User : {user}")
+                bagian.append(f"User  : {user}")
                 bagian.append(f"Friday: {friday}")
 
         return "\n".join(bagian) if bagian else ""
@@ -86,27 +179,47 @@ class GeminiAI:
             return "Maaf, koneksi ke AI sedang bermasalah."
         tampilkan_memproses()
         try:
-            response = self.chat.send_message(perintah)
-            return self._bersihkan(response.text)
+            if _SDK_MODE == "generativeai":
+                response = self.chat.send_message(perintah)
+                return self._bersihkan(response.text)
+            else:
+                from google.genai import types
+                contents = self._history + [{"role": "user", "parts": [perintah]}]
+                resp = self._client.models.generate_content(
+                    model=self._model_name,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        system_instruction=self._system,
+                        max_output_tokens=MAX_TOKENS,
+                        temperature=0.75,
+                    ),
+                )
+                jawaban = self._bersihkan(resp.text)
+                self._history.append({"role": "user",  "parts": [perintah]})
+                self._history.append({"role": "model", "parts": [jawaban]})
+                if len(self._history) > 20:
+                    self._history = self._history[-20:]
+                return jawaban
         except Exception as e:
-            tampilkan_status(f"Error Gemini: {e}", "error")
+            err = str(e)
+            tampilkan_status(f"Error Gemini: {err}", "error")
+            if "API_KEY" in err.upper() or "api key" in err.lower():
+                return "API key Gemini tidak valid. Periksa config.py."
+            if "quota" in err.lower() or "429" in err:
+                return "Kuota Gemini habis. Coba lagi nanti."
             return "Maaf, saya sedang mengalami gangguan."
 
     def tanya_dengan_web(self, pertanyaan: str, konteks_web: str) -> str:
         if not self._terhubung:
             return "Maaf, koneksi ke AI bermasalah."
-        tampilkan_memproses()
-        try:
-            response = self.chat.send_message(konteks_web)
-            return self._bersihkan(response.text)
-        except Exception as e:
-            tampilkan_status(f"Error Gemini (web): {e}", "error")
-            return "Maaf, gagal memproses hasil pencarian."
+        return self.tanya(konteks_web)
 
     def reset_sesi(self) -> None:
-        if self.model:
+        if _SDK_MODE == "generativeai" and self.model:
             self.chat = self.model.start_chat(history=[])
-            tampilkan_status("Sesi percakapan direset.", "info")
+        elif _SDK_MODE == "genai":
+            self._history = []
+        tampilkan_status("Sesi percakapan direset.", "info")
 
     def bangun_konteks(self, suara_user, waktu, cuaca, berita):
         berita_str = " | ".join(berita) if berita else "tidak tersedia"

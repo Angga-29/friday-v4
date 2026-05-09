@@ -24,7 +24,12 @@ except ImportError:
 
 # --- KAMERA (IP Webcam) ---
 # Buka aplikasi IPWebcam di Android → Start server → salin URL yang muncul
+# Jika tidak punya IP Webcam, biarkan default dan set KAMERA_WAJIB = False
 URL_KAMERA = os.getenv("CAMERA_URL", "http://192.168.x.x:8080/shot.jpg")
+
+# False = Friday tetap jalan walau kamera gagal (mode suara saja)
+# True  = Friday berhenti jika kamera tidak tersambung
+KAMERA_WAJIB = os.getenv("KAMERA_WAJIB", "false").lower() == "true"
 
 # --- API KEYS ---
 # Google Gemini  → https://aistudio.google.com/app/apikey (GRATIS)

@@ -1,33 +1,48 @@
 # ==============================================================
 # requirements.txt — Project Friday v4.0.0
 # Platform: Termux (Android) + IP Webcam + Xiaomi Pad 7
+#
+# PENTING untuk Termux — install OpenCV via pkg, BUKAN pip:
+#   pkg install python-opencv
+#   (pip install opencv-contrib-python GAGAL di Android ARM)
 # ==============================================================
-
-# Computer Vision (contrib WAJIB untuk pengenalan wajah!)
-opencv-contrib-python>=4.8.0
-numpy>=1.24.0
 
 # HTTP & API
 requests>=2.31.0
 
 # Google Gemini AI + Vision
-google-generativeai>=0.7.0
+google-generativeai>=0.8.0
 
-# Suara — Edge-TTS Premium (suara Microsoft Neural, gratis)
+# Suara — Edge-TTS Premium (suara Microsoft Neural, gratis, online)
 edge-tts>=6.1.0
 
-# Suara — Fallback
+# Suara — Fallback Google TTS
 gTTS>=2.4.0
 
-# Speech Recognition
+# Speech Recognition (butuh: pkg install flac portaudio)
 SpeechRecognition>=3.10.0
 PyAudio>=0.2.13
 
-# Browsing Internet — ddgs (nama baru) atau duckduckgo-search (lama)
+# Browsing Internet
 ddgs>=0.6.0
 
 # Terminal Warna
 colorama>=0.4.6
 
-# Environment variables (opsional — untuk load API key dari .env)
+# Environment variables
 python-dotenv>=1.0.0
+
+# ==============================================================
+# CATATAN TERMUX — Install manual (tidak bisa via pip):
+#
+#   pkg install python-opencv   ← OpenCV (termasuk cv2)
+#   pkg install flac            ← Wajib untuk SpeechRecognition
+#   pkg install portaudio       ← Wajib untuk PyAudio
+#   pkg install mpv             ← Audio player utama
+#   pkg install ffmpeg          ← Audio player fallback
+#   pkg install termux-api      ← Untuk mikrofon Termux
+#
+# Pengenalan wajah (opsional — opencv-contrib):
+#   Tidak tersedia di Termux. Friday berjalan tanpa pengenalan
+#   wajah tapi deteksi wajah (haar cascade) tetap aktif.
+# ==============================================================
