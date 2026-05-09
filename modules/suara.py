@@ -1,13 +1,15 @@
 # ==============================================================
 # modules/suara.py — Project Friday | Modul TTS Premium
-# Versi : 3.0.1 — Triple fallback: Edge-TTS → Termux → gTTS
+# Versi : 4.0.1 — Fix: error jelas + 4 fallback audio player
 # ==============================================================
 """
-Sistem suara dengan 3 tingkat fallback:
+Urutan fallback TTS:
+  1. Edge-TTS  (Microsoft Neural, online, suara terbaik)
+  2. Termux TTS (termux-tts-speak, offline, native Android)
+  3. gTTS       (Google TTS, online)
 
-PRIORITAS 1: Microsoft Edge-TTS (suara premium, natural, gratis, online)
-PRIORITAS 2: Termux TTS (offline, robotik, native Android)
-PRIORITAS 3: Google gTTS (online, cukup natural)
+Urutan fallback audio player:
+  mpv → ffplay → termux-media-player → play (sox) → am startservice
 """
 
 import os
@@ -16,17 +18,16 @@ import asyncio
 import subprocess
 from modules.tampilan import tampilkan_friday_bicara, tampilkan_status
 
-# Suara Edge-TTS Bahasa Indonesia (suara wanita natural)
-EDGE_VOICE = "id-ID-GadisNeural"   # Alternatif: id-ID-ArdiNeural (pria)
+EDGE_VOICE = "id-ID-GadisNeural"   # Alternatif pria: id-ID-ArdiNeural
 
-# Gunakan $TMPDIR dari Termux agar tidak Permission Denied di Android.
-# Fallback ke folder modules jika TMPDIR tidak tersedia.
-_TMPDIR = os.environ.get("TMPDIR") or os.path.dirname(os.path.abspath(__file__))
+_TMPDIR    = os.environ.get("TMPDIR") or os.path.dirname(os.path.abspath(__file__))
 TEMP_AUDIO = os.path.join(_TMPDIR, "friday_voice.mp3")
+
+# Catat sekali saja agar tidak spam
+_mpv_missing_logged = False
 
 
 def _bersihkan_teks(teks: str) -> str:
-    """Bersihkan karakter pengganggu TTS."""
     teks = teks.replace("*", "").replace("#", "").replace("`", "")
     teks = teks.replace('"', "").replace("'", "")
     teks = re.sub(r'[\x00-\x1f\x7f]', '', teks)
@@ -34,7 +35,6 @@ def _bersihkan_teks(teks: str) -> str:
 
 
 def _edge_tts_tersedia() -> bool:
-    """Cek apakah edge-tts terinstall."""
     try:
         import edge_tts  # noqa: F401
         return True
@@ -43,14 +43,12 @@ def _edge_tts_tersedia() -> bool:
 
 
 async def _generate_edge_tts(teks: str) -> bool:
-    """Generate audio dengan Edge-TTS, simpan ke file."""
     try:
         import edge_tts
         communicate = edge_tts.Communicate(teks, EDGE_VOICE)
         await communicate.save(TEMP_AUDIO)
         return True
     except ImportError:
-        # Sudah dicek di _edge_tts_tersedia(), tidak perlu log lagi
         return False
     except Exception as e:
         tampilkan_status(f"Edge-TTS error: {e}", "peringatan")
@@ -59,89 +57,111 @@ async def _generate_edge_tts(teks: str) -> bool:
 
 def _putar_audio(file_path: str) -> bool:
     """
-    Putar file audio menggunakan mpv, ffplay, atau play (sox).
-    Menggunakan subprocess.run() agar aman dari shell injection.
+    Coba putar file audio dengan urutan player yang tersedia.
+    Menampilkan peringatan jelas jika semua player gagal.
     """
+    global _mpv_missing_logged
+
     players = [
-        ["mpv", "--no-video", "--volume=100", "--quiet", "--really-quiet", file_path],
-        ["ffplay", "-nodisp", "-autoexit", "-volume", "100", "-loglevel", "quiet", file_path],
-        ["play", "-q", file_path],
+        # format: (nama_display, [perintah...])
+        ("mpv",                ["mpv", "--no-video", "--volume=100",
+                                "--quiet", "--really-quiet", file_path]),
+        ("ffplay",             ["ffplay", "-nodisp", "-autoexit",
+                                "-volume", "100", "-loglevel", "quiet", file_path]),
+        ("termux-media-player",["termux-media-player", "play", file_path]),
+        ("play/sox",           ["play", "-q", file_path]),
     ]
-    for cmd in players:
+
+    for nama, cmd in players:
         try:
             ret = subprocess.run(cmd, capture_output=True, timeout=60)
             if ret.returncode == 0:
                 return True
-        except (FileNotFoundError, subprocess.TimeoutExpired):
+        except FileNotFoundError:
             continue
+        except subprocess.TimeoutExpired:
+            continue
+
+    # Semua player gagal — tampilkan pesan jelas SATU KALI
+    if not _mpv_missing_logged:
+        _mpv_missing_logged = True
+        tampilkan_status(
+            "Tidak ada audio player! Install mpv agar suara keluar:", "error"
+        )
+        tampilkan_status("  pkg install mpv", "info")
+        tampilkan_status(
+            "Atau install Termux:API dari Play Store → pkg install termux-api",
+            "info"
+        )
     return False
 
 
 def bicara(teks: str) -> None:
-    """
-    Friday berbicara dengan triple fallback:
-    Edge-TTS → Termux TTS → gTTS
-    """
+    """Friday berbicara — Edge-TTS → Termux TTS → gTTS."""
     tampilkan_friday_bicara(teks)
     teks_bersih = _bersihkan_teks(teks)
     if not teks_bersih:
         return
 
-    # ── PRIORITAS 1: Edge-TTS (suara premium Microsoft) ──
+    # ── PRIORITAS 1: Edge-TTS ──────────────────────────────────
     if _edge_tts_tersedia():
         try:
             sukses = asyncio.run(_generate_edge_tts(teks_bersih))
-            if sukses and os.path.exists(TEMP_AUDIO):
-                if _putar_audio(TEMP_AUDIO):
-                    try:
-                        os.remove(TEMP_AUDIO)
-                    except OSError:
-                        pass
-                    return
-                tampilkan_status("Audio gagal diputar, fallback...", "peringatan")
         except RuntimeError:
-            # asyncio.run() gagal jika ada event loop aktif
             try:
                 loop = asyncio.new_event_loop()
                 sukses = loop.run_until_complete(_generate_edge_tts(teks_bersih))
                 loop.close()
-                if sukses and os.path.exists(TEMP_AUDIO):
-                    if _putar_audio(TEMP_AUDIO):
-                        try:
-                            os.remove(TEMP_AUDIO)
-                        except OSError:
-                            pass
-                        return
             except Exception:
-                pass
+                sukses = False
         except Exception as e:
             tampilkan_status(f"Edge-TTS gagal: {e}", "peringatan")
+            sukses = False
 
-    # ── PRIORITAS 2: Termux TTS (cepat, offline) ──
+        if sukses and os.path.exists(TEMP_AUDIO):
+            if _putar_audio(TEMP_AUDIO):
+                try:
+                    os.remove(TEMP_AUDIO)
+                except OSError:
+                    pass
+                return
+            # Audio file ada tapi tidak bisa diputar
+            try:
+                os.remove(TEMP_AUDIO)
+            except OSError:
+                pass
+
+    # ── PRIORITAS 2: Termux TTS (offline, native) ─────────────
     try:
         ret = subprocess.run(
             ["termux-tts-speak", teks_bersih],
-            capture_output=True,
-            timeout=30
+            capture_output=True, timeout=30
         )
         if ret.returncode == 0:
             return
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass  # Termux TTS tidak tersedia
+    except FileNotFoundError:
+        pass
+    except subprocess.TimeoutExpired:
+        tampilkan_status("Termux TTS timeout.", "peringatan")
 
-    # ── PRIORITAS 3: gTTS (Google TTS) ──
-    tampilkan_status("Termux TTS tidak tersedia, mencoba gTTS...", "peringatan")
+    # ── PRIORITAS 3: gTTS + audio player ──────────────────────
     try:
         from gtts import gTTS
         tts = gTTS(text=teks_bersih, lang='id', slow=False)
         tts.save(TEMP_AUDIO)
-        _putar_audio(TEMP_AUDIO)
-        try:
-            if os.path.exists(TEMP_AUDIO):
+        if _putar_audio(TEMP_AUDIO):
+            try:
                 os.remove(TEMP_AUDIO)
+            except OSError:
+                pass
+            return
+        try:
+            os.remove(TEMP_AUDIO)
         except OSError:
             pass
     except ImportError:
-        tampilkan_status("Tidak ada engine TTS yang tersedia!", "error")
+        pass
     except Exception as e:
-        tampilkan_status(f"Error TTS final: {e}", "error")
+        tampilkan_status(f"gTTS error: {e}", "peringatan")
+
+    # Semua gagal — pesan hanya ditampilkan oleh _putar_audio()

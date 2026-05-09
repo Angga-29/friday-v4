@@ -9,7 +9,7 @@ from datetime import datetime
 
 init(autoreset=True)
 
-VERSION   = "3.0.0"
+VERSION   = "4.0.0"
 LEBAR_BOX = 54
 
 
