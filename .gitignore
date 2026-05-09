@@ -1,0 +1,55 @@
+# ==============================================================
+# .gitignore — Project Friday
+# File ini mencegah data sensitif dan tidak perlu masuk ke GitHub
+# ==============================================================
+
+# ── Konfigurasi (berisi API key!) ──────────────────────────────
+config.py
+.env
+
+# ── Database memori Friday ────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+~/.friday_memory/
+
+# ── File audio sementara ──────────────────────────────────────
+/tmp/friday_voice.mp3
+*.mp3
+*.wav
+
+# ── Python ────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# ── Virtual environment ───────────────────────────────────────
+venv/
+env/
+.venv/
+ENV/
+
+# ── IDE & Editor ──────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Log ───────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Data wajah (privasi pengguna) ─────────────────────────────
+# Hapus baris ini jika ingin menyertakan foto demo
+data/wajah_dikenal/*/
+!data/wajah_dikenal/README.txt
