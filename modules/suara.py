@@ -87,6 +87,15 @@ def _putar_audio(file_path: str) -> bool:
     """
     global _mpv_missing_logged
 
+    # Cek ukuran file — MP3 kosong/corrupt tidak perlu diputar
+    try:
+        ukuran = os.path.getsize(file_path)
+        if ukuran < 512:
+            tampilkan_status(f"File audio terlalu kecil ({ukuran} bytes) — skip.", "peringatan")
+            return False
+    except OSError:
+        return False
+
     players = [
         ("mpv",    ["mpv", "--no-video", "--volume=100",
                     "--quiet", "--really-quiet", file_path]),
@@ -99,15 +108,21 @@ def _putar_audio(file_path: str) -> bool:
         try:
             ret = subprocess.run(cmd, capture_output=True, timeout=120)
             if ret.returncode == 0:
+                tampilkan_status(f"Audio diputar via {nama}.", "info")
                 return True
         except FileNotFoundError:
             continue
         except subprocess.TimeoutExpired:
+            tampilkan_status(f"{nama} timeout saat memutar audio.", "peringatan")
             continue
 
     if not _mpv_missing_logged:
         _mpv_missing_logged = True
-        tampilkan_status("Tidak ada audio player! Install: pkg install mpv", "error")
+        tampilkan_status(
+            "Tidak ada audio player! Suara tidak keluar.\n"
+            "  Install: pkg install mpv",
+            "error"
+        )
     return False
 
 
