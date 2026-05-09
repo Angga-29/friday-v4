@@ -56,6 +56,15 @@ class WakeWordDetector:
                 tampilkan_status("Wake word listener aktif. Panggil 'Hai Friday'.", "info")
 
                 while self.aktif:
+                    # ── Anti-echo: skip saat Friday sedang bicara ──
+                    try:
+                        from modules.suara import sedang_bicara
+                        if sedang_bicara():
+                            time.sleep(0.2)
+                            continue
+                    except ImportError:
+                        pass
+
                     try:
                         audio = self.recognizer.listen(
                             source,

@@ -56,11 +56,12 @@ class GeminiAI:
             # Coba model utama (Gemini 2.5 Flash)
             self.model = self._buat_model_generativeai(full_system, MODEL_UTAMA)
             if self.model is None:
-                # Fallback ke Gemini 1.5 Flash
                 tampilkan_status(
                     f"Gagal load {MODEL_UTAMA}, mencoba {MODEL_FALLBACK}...", "peringatan"
                 )
                 self.model = self._buat_model_generativeai(full_system, MODEL_FALLBACK)
+            # Simpan nama model yang aktif untuk keperluan recovery
+            self._active_model_name = MODEL_UTAMA if self.model else MODEL_FALLBACK
 
             if self.model:
                 self.chat       = self.model.start_chat(history=[])
@@ -75,49 +76,23 @@ class GeminiAI:
             tampilkan_status(f"Gagal init Gemini AI: {e}", "error")
 
     def _buat_model_generativeai(self, system_prompt: str, model_name: str):
-        """Buat GenerativeModel dengan penanganan thinking config Gemini 2.5."""
+        """Buat GenerativeModel — kompatibel semua versi google-generativeai."""
+        # Konfigurasi dasar tanpa thinking_config agar kompatibel semua versi
+        gen_config = {
+            "max_output_tokens": MAX_TOKENS,
+            "temperature"      : 0.75,
+            "top_p"            : 0.95,
+        }
         try:
-            # Konfigurasi dasar — kompatibel semua versi
-            gen_config = {
-                "max_output_tokens": MAX_TOKENS,
-                "temperature"      : 0.75,
-                "top_p"            : 0.95,
-            }
-
-            # Gemini 2.5 Flash punya "thinking" — nonaktifkan untuk kecepatan
-            if "2.5" in model_name:
-                try:
-                    gen_config["thinking_config"] = {"thinking_budget": 0}
-                except Exception:
-                    pass
-
             model = genai.GenerativeModel(
                 model_name=model_name,
                 system_instruction=system_prompt,
                 generation_config=gen_config,
             )
-            # Test koneksi
             model.start_chat(history=[])
             tampilkan_status(f"Model {model_name} dimuat.", "sukses")
             return model
-
         except Exception as e:
-            err = str(e)
-            if "thinking_config" in err or "thinking" in err.lower():
-                # Retry tanpa thinking_config
-                try:
-                    gen_config.pop("thinking_config", None)
-                    model = genai.GenerativeModel(
-                        model_name=model_name,
-                        system_instruction=system_prompt,
-                        generation_config=gen_config,
-                    )
-                    model.start_chat(history=[])
-                    tampilkan_status(f"Model {model_name} dimuat (tanpa thinking_config).", "sukses")
-                    return model
-                except Exception as e2:
-                    tampilkan_status(f"Gagal load {model_name}: {e2}", "peringatan")
-                    return None
             tampilkan_status(f"Gagal load {model_name}: {e}", "peringatan")
             return None
 
@@ -202,11 +177,24 @@ class GeminiAI:
                 return jawaban
         except Exception as e:
             err = str(e)
-            tampilkan_status(f"Error Gemini: {err}", "error")
             if "API_KEY" in err.upper() or "api key" in err.lower():
                 return "API key Gemini tidak valid. Periksa config.py."
             if "quota" in err.lower() or "429" in err:
                 return "Kuota Gemini habis. Coba lagi nanti."
+            if "thinking" in err.lower():
+                # Versi lama tidak support thinking — reinit model tanpa config tersebut
+                tampilkan_status("Reinisialisasi model (thinking not supported)...", "peringatan")
+                model_name = getattr(self, '_active_model_name', MODEL_UTAMA)
+                full_system = self._bangun_system_prompt(self.system_prompt)
+                self.model = self._buat_model_generativeai(full_system, model_name)
+                if self.model:
+                    self.chat = self.model.start_chat(history=[])
+                    try:
+                        response = self.chat.send_message(perintah)
+                        return self._bersihkan(response.text)
+                    except Exception:
+                        pass
+            tampilkan_status(f"Error Gemini: {err}", "error")
             return "Maaf, saya sedang mengalami gangguan."
 
     def tanya_dengan_web(self, pertanyaan: str, konteks_web: str) -> str:

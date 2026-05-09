@@ -1,5 +1,5 @@
 # modules/pendengar.py — Project Friday | Modul Pengenalan Suara
-# Versi 2.1 — Fix: buffer TTS, retry otomatis, feedback jelas
+# Versi 2.2 — Fix echo: tunggu flag sedang_bicara sebelum rekam
 # ==============================================================
 
 import time
@@ -11,12 +11,13 @@ from modules.tampilan import (
 )
 
 # --- Konfigurasi ---
-TIMEOUT_TUNGGU        = 7     # Detik menunggu suara mulai (dinaikkan)
+TIMEOUT_TUNGGU        = 7     # Detik menunggu suara mulai
 BATAS_DURASI          = 12    # Durasi maksimal bicara (detik)
 JEDA_KALIMAT          = 2.0   # Jeda sebelum dianggap selesai bicara
 BAHASA                = "id-ID"
-BUFFER_SETELAH_TTS    = 1.2   # Jeda (detik) setelah Friday bicara sebelum dengar
+BUFFER_SETELAH_TTS    = 2.5   # Jeda setelah Friday selesai bicara (naik dari 1.2)
 MAX_RETRY             = 2     # Coba dengar ulang jika gagal
+TIMEOUT_TUNGGU_BICARA = 15    # Maks tunggu Friday selesai bicara (detik)
 
 
 def dengarkan(setelah_tts: bool = True) -> str | None:
@@ -30,8 +31,20 @@ def dengarkan(setelah_tts: bool = True) -> str | None:
     Returns:
         Teks hasil transkripsi, atau None jika tidak ada / gagal.
     """
-    # ✅ FIX #1: Buffer waktu agar TTS selesai sebelum mikrofon aktif
-    # Mencegah mikrofon menangkap suara Friday sendiri
+    # ── Anti-echo: tunggu Friday selesai bicara dulu ──────────
+    # Import di dalam fungsi untuk menghindari circular import
+    try:
+        from modules.suara import sedang_bicara
+        if sedang_bicara():
+            tampilkan_status("Menunggu Friday selesai bicara...", "info")
+            batas = time.time() + TIMEOUT_TUNGGU_BICARA
+            while sedang_bicara() and time.time() < batas:
+                time.sleep(0.1)
+
+    except ImportError:
+        pass
+
+    # Buffer tambahan setelah audio selesai agar gema di ruangan hilang
     if setelah_tts:
         time.sleep(BUFFER_SETELAH_TTS)
 
