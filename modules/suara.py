@@ -1,6 +1,6 @@
 # ==============================================================
 # modules/suara.py — Project Friday | Modul TTS
-# Versi : 4.2.0 — Fix kritis: hapus duplikasi bicara(), anti-echo benar
+# Versi : 4.3.0 — Fix asyncio conflict: Edge-TTS di thread terpisah
 # ==============================================================
 """
 Urutan fallback TTS:
@@ -26,7 +26,6 @@ Anti-echo:
 import os
 import re
 import time
-import asyncio
 import threading
 import subprocess
 from modules.tampilan import tampilkan_friday_bicara, tampilkan_status
@@ -67,17 +66,34 @@ def _edge_tts_tersedia() -> bool:
         return False
 
 
-async def _generate_edge_tts(teks: str) -> bool:
-    try:
-        import edge_tts
-        communicate = edge_tts.Communicate(teks, EDGE_VOICE)
-        await communicate.save(TEMP_AUDIO)
-        return True
-    except ImportError:
-        return False
-    except Exception as e:
-        tampilkan_status(f"Edge-TTS error: {e}", "peringatan")
-        return False
+def _generate_edge_tts_sync(teks: str) -> bool:
+    """
+    Generate MP3 Edge-TTS di thread terpisah dengan event loop baru.
+    Cara ini menghindari konflik dengan event loop asyncio yang mungkin
+    sudah jalan di thread utama (wake word, proaktif, dll).
+    """
+    hasil = [False]
+
+    def _run():
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            import edge_tts
+            communicate = edge_tts.Communicate(teks, EDGE_VOICE)
+            loop.run_until_complete(communicate.save(TEMP_AUDIO))
+            hasil[0] = True
+        except ImportError:
+            pass
+        except Exception as e:
+            tampilkan_status(f"Edge-TTS error: {e}", "peringatan")
+        finally:
+            loop.close()
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    t.join(timeout=30)
+    return hasil[0]
 
 
 def _putar_audio(file_path: str) -> bool:
@@ -152,20 +168,9 @@ def bicara(teks: str) -> None:
 def _bicara_internal(teks_bersih: str) -> None:
     """TTS internal — dipanggil dari bicara() saat flag sudah di-set."""
 
-    # ── PRIORITAS 1: Edge-TTS ──────────────────────────────
+    # ── PRIORITAS 1: Edge-TTS (jalan di thread sendiri, tidak bentrok asyncio) ──
     if _edge_tts_tersedia():
-        try:
-            sukses = asyncio.run(_generate_edge_tts(teks_bersih))
-        except RuntimeError:
-            try:
-                loop = asyncio.new_event_loop()
-                sukses = loop.run_until_complete(_generate_edge_tts(teks_bersih))
-                loop.close()
-            except Exception:
-                sukses = False
-        except Exception as e:
-            tampilkan_status(f"Edge-TTS gagal: {e}", "peringatan")
-            sukses = False
+        sukses = _generate_edge_tts_sync(teks_bersih)
 
         if sukses and os.path.exists(TEMP_AUDIO):
             if _putar_audio(TEMP_AUDIO):
