@@ -212,12 +212,22 @@ body::after{{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   <div class="logo-wrap"><span class="logo">FRIDAY</span></div>
   <div class="logo-sub">AI PERSONAL ASSISTANT &nbsp;·&nbsp; v4.0 PREMIUM</div>
 
-  <!-- Status -->
+  <!-- Status + Tombol STOP -->
   <div class="status-bar">
     <div class="sdot"></div>
     <span class="slabel">SYS&nbsp;</span>
     <span class="sval">{status.upper()}</span>
-    <span style="margin-left:auto;color:rgba(0,229,255,0.4);font-size:10px;">BOS {nama.upper()}</span>
+    <span style="margin-left:auto;display:flex;align-items:center;gap:10px;">
+      <span style="color:rgba(0,229,255,0.4);font-size:10px;">BOS {nama.upper()}</span>
+      <button id="stopBtn" onclick="stopFriday()"
+        style="display:{"flex" if status=="Berbicara" else "none"};
+        align-items:center;gap:5px;background:rgba(200,0,80,0.15);
+        border:1px solid #c80050;color:#ff4488;padding:3px 10px;
+        font-family:inherit;font-size:10px;letter-spacing:2px;cursor:pointer;
+        animation:pulse-s 1s infinite;">
+        ⏹ STOP
+      </button>
+    </span>
   </div>
 
   <!-- Ticker -->
@@ -287,6 +297,15 @@ body::after{{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 </div>
 
 <script>
+// Barge-in: hentikan Friday
+function stopFriday(){{
+  fetch('/stop').then(()=>{{
+    const btn=document.getElementById('stopBtn');
+    if(btn){{btn.textContent='✓ DIHENTIKAN';btn.style.color='#00ff88';}}
+    setTimeout(()=>location.reload(),1200);
+  }}).catch(()=>{{}});
+}}
+
 // Live clock
 function tick(){{
   const n=new Date();
@@ -350,9 +369,33 @@ setInterval(tick,1000);tick();
     return html
 
 
+# Callback untuk barge-in — di-set oleh main.py setelah import suara
+_stop_callback = None
+
+def set_stop_callback(fn):
+    """Daftarkan fungsi stop_bicara() agar bisa dipanggil via endpoint /stop."""
+    global _stop_callback
+    _stop_callback = fn
+
+
 class _Handler(BaseHTTPRequestHandler):
-    """Serve HTML dashboard untuk setiap request GET."""
+    """Serve HTML dashboard + endpoint /stop untuk barge-in."""
+
     def do_GET(self):
+        if self.path == "/stop":
+            # Barge-in: hentikan TTS yang sedang berjalan
+            if _stop_callback:
+                try:
+                    _stop_callback()
+                except Exception:
+                    pass
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(b'{"ok":true}')
+            return
+
         html = _generate_html().encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -361,7 +404,7 @@ class _Handler(BaseHTTPRequestHandler):
         self.wfile.write(html)
 
     def log_message(self, *args):
-        pass   # Matikan log bawaan HTTPServer agar tidak spam terminal
+        pass
 
 
 def _start_server():

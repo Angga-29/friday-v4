@@ -37,18 +37,31 @@ TEMP_AUDIO = os.path.join(_TMPDIR, "friday_voice.mp3")
 
 # ── Flag anti-echo — dibaca oleh pendengar.py dan wake_word.py ──
 _sedang_bicara      = threading.Event()
+_interrupt_event    = threading.Event()   # barge-in: set → potong audio
+_proses_audio       = None                # subprocess player yang sedang berjalan
 _teks_terakhir      = ""
 _mpv_missing_logged = False
 
 
 def sedang_bicara() -> bool:
-    """Return True saat Friday sedang memutar audio TTS."""
     return _sedang_bicara.is_set()
 
 
 def teks_terakhir_diucapkan() -> str:
-    """Return teks terakhir yang diucapkan Friday — untuk deteksi echo."""
     return _teks_terakhir
+
+
+def stop_bicara():
+    """Interrupt Friday di tengah bicara (barge-in). Aman dipanggil dari thread manapun."""
+    global _proses_audio
+    _interrupt_event.set()
+    proc = _proses_audio
+    if proc and proc.poll() is None:
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+    tampilkan_status("⏹ Dihentikan (barge-in).", "info")
 
 
 def _bersihkan_teks(teks: str) -> str:
@@ -98,11 +111,10 @@ def _generate_edge_tts_sync(teks: str) -> bool:
 
 def _putar_audio(file_path: str) -> bool:
     """
-    Putar audio — hanya player yang BENAR-BENAR blocking di Android.
-    play (sox) dihapus: return 0 tapi tidak ada suara di Termux Android.
-    Jika semua gagal → return False → _bicara_internal pakai Termux TTS.
+    Putar audio dengan Popen + polling — mendukung barge-in (interrupt).
+    Jika _interrupt_event di-set saat audio berjalan, player langsung dimatikan.
     """
-    global _mpv_missing_logged
+    global _mpv_missing_logged, _proses_audio
 
     try:
         ukuran = os.path.getsize(file_path)
@@ -121,22 +133,37 @@ def _putar_audio(file_path: str) -> bool:
 
     for nama, cmd in players:
         try:
-            ret = subprocess.run(cmd, capture_output=True, timeout=120)
-            if ret.returncode == 0:
-                tampilkan_status(f"Audio diputar via {nama}.", "info")
+            proc = subprocess.Popen(cmd,
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.PIPE)
+            _proses_audio = proc
+
+            # Poll setiap 50ms — cek interrupt
+            while proc.poll() is None:
+                if _interrupt_event.is_set():
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=1)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                    _proses_audio = None
+                    return True   # dianggap selesai (diinterrupt)
+                time.sleep(0.05)
+
+            _proses_audio = None
+            rc = proc.returncode
+            if rc == 0:
+                tampilkan_status(f"Audio selesai via {nama}.", "info")
                 return True
-            else:
-                # Log error mpv/ffplay agar bisa didiagnosis
-                err_out = ret.stderr.decode(errors="ignore").strip()
-                if err_out:
-                    tampilkan_status(f"{nama} gagal: {err_out[:120]}", "peringatan")
+            err = proc.stderr.read().decode(errors="ignore").strip()
+            if err:
+                tampilkan_status(f"{nama} gagal: {err[:120]}", "peringatan")
         except FileNotFoundError:
             continue
-        except subprocess.TimeoutExpired:
-            tampilkan_status(f"{nama} timeout.", "peringatan")
+        except Exception as e:
+            tampilkan_status(f"{nama} error: {e}", "peringatan")
             continue
 
-    # Semua player MP3 gagal — biarkan _bicara_internal pakai Termux TTS
     if not _mpv_missing_logged:
         _mpv_missing_logged = True
         tampilkan_status(
@@ -148,9 +175,8 @@ def _putar_audio(file_path: str) -> bool:
 
 def bicara(teks: str) -> None:
     """
-    Friday berbicara.
-    Set _sedang_bicara SEBELUM audio → clear SETELAH audio + jeda reverb.
-    Ini mencegah pendengar.py merekam saat Friday masih berbicara.
+    Friday berbicara. Mendukung barge-in: jika stop_bicara() dipanggil
+    dari thread lain saat audio berjalan, audio langsung berhenti.
     """
     global _teks_terakhir
 
@@ -160,13 +186,29 @@ def bicara(teks: str) -> None:
         return
 
     _teks_terakhir = teks_bersih.lower()
+    _interrupt_event.clear()
     _sedang_bicara.set()
+
+    # Update dashboard status → tombol STOP muncul di Chrome
+    try:
+        from modules.dashboard import update_data as _du
+        _du(status="Berbicara")
+    except Exception:
+        pass
 
     try:
         _bicara_internal(teks_bersih)
     finally:
-        time.sleep(2.0)
+        jeda = 0.5 if _interrupt_event.is_set() else 2.0
+        _interrupt_event.clear()
+        time.sleep(jeda)
         _sedang_bicara.clear()
+        # Kembalikan status dashboard ke Standby
+        try:
+            from modules.dashboard import update_data as _du
+            _du(status="Standby")
+        except Exception:
+            pass
 
 
 def _bicara_internal(teks_bersih: str) -> None:
@@ -188,20 +230,32 @@ def _bicara_internal(teks_bersih: str) -> None:
             except OSError:
                 pass
 
-    # ── PRIORITAS 2: Termux TTS (blocking, offline) ────────
+    # ── PRIORITAS 2: Termux TTS (interruptible via Popen) ──
     try:
         tampilkan_status("Bicara via Termux TTS...", "info")
-        ret = subprocess.run(
+        proc = subprocess.Popen(
             ["termux-tts-speak", teks_bersih],
-            capture_output=True, timeout=60
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
-        if ret.returncode == 0:
+        _proses_audio = proc
+        while proc.poll() is None:
+            if _interrupt_event.is_set():
+                proc.terminate()
+                try:
+                    proc.wait(timeout=1)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                _proses_audio = None
+                return
+            time.sleep(0.05)
+        _proses_audio = None
+        if proc.returncode == 0:
             tampilkan_status("Audio selesai via Termux TTS.", "info")
             return
     except FileNotFoundError:
         tampilkan_status("termux-tts-speak tidak ada. Install: pkg install termux-api", "error")
-    except subprocess.TimeoutExpired:
-        tampilkan_status("Termux TTS timeout.", "peringatan")
+    except Exception as e:
+        tampilkan_status(f"Termux TTS error: {e}", "peringatan")
 
     # ── PRIORITAS 3: gTTS + audio player ──────────────────
     try:

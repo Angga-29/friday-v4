@@ -34,7 +34,7 @@ from modules.tampilan    import (
     pop_up_berita, tampilkan_browsing, tampilkan_vision,
     tampilkan_statistik, tampilkan_app_dibuka, tampilkan_musik
 )
-from modules.suara       import bicara, _sedang_bicara as _tts_event
+from modules.suara       import bicara, stop_bicara, _sedang_bicara as _tts_event
 from modules.pendengar   import dengarkan
 from modules.tepuk       import DetektorTepuk
 from modules.info        import dapatkan_waktu, dapatkan_cuaca, dapatkan_cuaca_data, dapatkan_berita
@@ -45,7 +45,7 @@ from modules.wake_word   import WakeWordDetector
 from modules.penglihatan import perlu_penglihatan, deskripsikan_pemandangan
 from modules.proaktif    import ModeProaktif
 from modules.riset       import perlu_riset, riset_mendalam
-from modules.dashboard   import buka_dashboard, refresh_dashboard, update_data as dashboard_update, tutup_dashboard
+from modules.dashboard   import buka_dashboard, refresh_dashboard, update_data as dashboard_update, tutup_dashboard, set_stop_callback
 from skills              import SkillManager
 
 # Import modul kamera & wajah — opsional (tidak crash jika tidak tersedia)
@@ -186,10 +186,11 @@ def inisialisasi_semua():
     wake_detector = WakeWordDetector(callback_terdeteksi=on_wake_word)
     wake_detector.mulai()
 
-    # 7b. Double Clap Detector (background thread — alternatif wake word)
+    # 7b. Double Clap Detector + barge-in (background thread)
     clap_detector = DetektorTepuk(
         callback=on_wake_word,
         sedang_bicara=_tts_event,
+        callback_interrupt=stop_bicara,   # 1x tepuk saat TTS = stop
     )
     clap_detector.mulai()
 
@@ -213,6 +214,7 @@ def inisialisasi_semua():
 
     # Buka web dashboard di Chrome — generate dulu dengan data nama
     dashboard_update(nama=config.NAMA_PENGGUNA)
+    set_stop_callback(stop_bicara)   # daftarkan endpoint /stop
     tampilkan_status("Membuka dashboard JARVIS di browser...", "info")
     buka_dashboard()
 

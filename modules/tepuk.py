@@ -14,33 +14,41 @@ import threading
 import time
 
 # ── Parameter (bisa ditambah ke config.py jika perlu di-tune) ──
-RATE       = 16000    # sample rate (Hz)
-CHUNK      = 512      # ukuran buffer kecil = respons cepat
-THRESHOLD  = 0.28     # ambang batas RMS (0.0-1.0). Naikan jika terlalu sensitif
-MIN_GAP    = 0.08     # jarak minimum antar tepuk (detik)
-MAX_GAP    = 0.70     # jarak maksimum untuk dianggap double clap (detik)
-COOLDOWN   = 3.0      # jeda setelah berhasil deteksi (detik)
-MAX_RETRY  = 8        # maksimum percobaan buka mic saat gagal
+RATE                = 16000   # sample rate (Hz)
+CHUNK               = 512     # ukuran buffer kecil = respons cepat
+THRESHOLD           = 0.28    # ambang batas RMS untuk double clap (0.0-1.0)
+THRESHOLD_INTERRUPT = 0.35    # ambang lebih tinggi untuk barge-in (hindari false trigger)
+MIN_GAP             = 0.08    # jarak minimum antar tepuk (detik)
+MAX_GAP             = 0.70    # jarak maksimum untuk dianggap double clap (detik)
+COOLDOWN            = 3.0     # jeda setelah berhasil deteksi wake (detik)
+COOLDOWN_INTERRUPT  = 1.5     # jeda setelah berhasil interrupt
+MAX_RETRY           = 8       # maksimum percobaan buka mic saat gagal
 
 
 class DetektorTepuk:
     """
-    Detektor double clap yang berjalan di background thread.
-    Tidak crash jika mic sedang dipakai — retry otomatis.
+    Detektor tepukan yang berjalan di background thread.
+
+    Mode:
+    - _sedang_bicara tidak aktif → deteksi double clap → callback wake word
+    - _sedang_bicara aktif       → deteksi single clap  → callback_interrupt (barge-in)
     """
 
-    def __init__(self, callback, sedang_bicara=None):
+    def __init__(self, callback, sedang_bicara=None, callback_interrupt=None):
         """
         Args:
-            callback       : Fungsi yang dipanggil saat double clap terdeteksi
-            sedang_bicara  : threading.Event — skip deteksi saat Friday bicara
+            callback           : Dipanggil saat double clap (wake word)
+            sedang_bicara      : threading.Event dari suara.py
+            callback_interrupt : Dipanggil saat single clap selama TTS aktif (barge-in)
         """
         self._cb            = callback
+        self._cb_interrupt  = callback_interrupt
         self._sedang_bicara = sedang_bicara
         self._aktif         = False
         self._thread        = None
-        self._last_clap     = 0.0   # waktu tepukan terakhir
-        self._last_trigger  = 0.0   # waktu terakhir callback dipanggil
+        self._last_clap     = 0.0
+        self._last_trigger  = 0.0
+        self._last_interrupt = 0.0
 
     # ── Public ────────────────────────────────────────────────
 
@@ -102,40 +110,47 @@ class DetektorTepuk:
                         "👏 Double clap aktif. Tepuk 2x untuk memanggil Friday.", "sukses"
                     )
 
-                # ── Skip saat Friday sedang bicara (anti-echo) ──
-                if self._sedang_bicara and self._sedang_bicara.is_set():
+                data = stream.read(CHUNK, exception_on_overflow=False)
+                amp  = self._rms(data)
+                now  = time.time()
+
+                tts_aktif = self._sedang_bicara and self._sedang_bicara.is_set()
+
+                # ── MODE BARGE-IN: Friday sedang bicara ──────────────
+                if tts_aktif:
+                    if self._cb_interrupt and amp >= THRESHOLD_INTERRUPT:
+                        if now - self._last_interrupt > COOLDOWN_INTERRUPT:
+                            self._last_interrupt = now
+                            tampilkan_status(
+                                "👏 Tepukan! Menghentikan Friday...", "deteksi"
+                            )
+                            try:
+                                self._cb_interrupt()
+                            except Exception:
+                                pass
                     time.sleep(0.05)
                     continue
 
-                data = stream.read(CHUNK, exception_on_overflow=False)
-                amp  = self._rms(data)
-
+                # ── MODE NORMAL: deteksi double clap ─────────────────
                 if amp < THRESHOLD:
-                    continue   # hening / suara biasa
+                    continue
 
-                now = time.time()
-
-                # Masih dalam cooldown setelah deteksi sebelumnya
                 if now - self._last_trigger < COOLDOWN:
                     continue
 
                 gap = now - self._last_clap
                 if self._last_clap > 0 and MIN_GAP < gap < MAX_GAP:
-                    # ✅ DOUBLE CLAP terdeteksi!
+                    # ✅ DOUBLE CLAP → aktifkan Friday
                     self._last_trigger = now
                     self._last_clap    = 0.0
-                    tampilkan_status(
-                        "👏 Double clap! Mengaktifkan Friday...", "deteksi"
-                    )
+                    tampilkan_status("👏 Double clap! Mengaktifkan Friday...", "deteksi")
                     try:
                         self._cb()
                     except Exception:
                         pass
                 else:
-                    # Tepukan pertama — catat waktu
                     self._last_clap = now
 
-                # Debounce: abaikan gema langsung setelah tepukan
                 time.sleep(0.06)
 
             except OSError as e:
