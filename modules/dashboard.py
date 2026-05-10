@@ -61,11 +61,19 @@ def _generate_html() -> str:
     c_kota  = cd.get("nama", "")
 
     berita_items = ""
-    for i, b in enumerate(berita[:4], 1):
-        judul = (b[:80] + "…") if len(b) > 80 else b
+    for i, b in enumerate(berita[:6], 1):
+        judul = (b[:90] + "…") if len(b) > 90 else b
+        # Tentukan warna berdasarkan sumber
+        if "🇮🇩" in b:
+            dot_color = "#00ff88"   # hijau = Indonesia
+        elif any(f in b for f in ("🌍","🇺🇸","🇬🇧","🇶🇦","💻")):
+            dot_color = "#00e5ff"   # cyan = internasional
+        else:
+            dot_color = "#ff9800"   # orange = newsapi / lainnya
+        nomor = f"0{i}" if i < 10 else str(i)
         berita_items += (
             f'<div class="news-row">'
-            f'<span class="n-idx">0{i}</span>'
+            f'<span class="n-idx" style="color:{dot_color};">{nomor}</span>'
             f'<span class="n-txt">{judul}</span>'
             f'</div>'
         )
@@ -266,7 +274,12 @@ body::after{{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 
   <!-- Berita -->
   <div class="news-wrap">
-    <div class="ctitle" style="margin-bottom:6px;">📡 INTEL FEED — BERITA TERKINI</div>
+    <div class="ctitle" style="margin-bottom:6px;">
+      📡 INTEL FEED &nbsp;
+      <span style="color:#00ff88;font-size:8px;">🇮🇩 INDONESIA</span>
+      &nbsp;+&nbsp;
+      <span style="color:#00e5ff;font-size:8px;">🌍 INTERNASIONAL</span>
+    </div>
     {berita_items}
   </div>
 

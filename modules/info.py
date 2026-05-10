@@ -160,8 +160,54 @@ def dapatkan_cuaca(api_key: str, kota: str) -> str:
 
 
 # ==============================================================
-# BERITA — Fallback: NewsAPI → RSS Kompas/CNN-ID/Detik
+# BERITA — Fallback: NewsAPI → RSS campuran Indonesia + Internasional
 # ==============================================================
+
+# Feed Indonesia
+_FEEDS_ID = [
+    ("🇮🇩 Kompas",   "https://rss.kompas.com/nasional/feed"),
+    ("🇮🇩 CNN-ID",   "https://www.cnnindonesia.com/rss"),
+    ("🇮🇩 Detik",    "https://rss.detik.com/index.php/detikcom"),
+    ("🇮🇩 Tempo",    "https://rss.tempo.co/"),
+    ("🇮🇩 Liputan6", "https://rss.liputan6.com/rss/tag/berita-terkini"),
+]
+
+# Feed Internasional
+_FEEDS_INTL = [
+    ("🌍 BBC",       "http://feeds.bbci.co.uk/news/world/rss.xml"),
+    ("🌍 Reuters",   "https://feeds.reuters.com/reuters/topNews"),
+    ("🌍 Al Jazeera","https://www.aljazeera.com/xml/rss/all.xml"),
+    ("🇺🇸 CNN",      "http://rss.cnn.com/rss/edition_world.rss"),
+    ("🇬🇧 Guardian", "https://www.theguardian.com/world/rss"),
+    ("💻 TechCrunch","https://techcrunch.com/feed/"),
+]
+
+
+def _ambil_rss(feeds: list, maks: int) -> list:
+    """Ambil judul dari daftar RSS feed, beri label sumber."""
+    hasil = []
+    for label, url in feeds:
+        if len(hasil) >= maks:
+            break
+        try:
+            r = requests.get(url, timeout=TIMEOUT_API,
+                             headers={"User-Agent": "Friday/4.0 (Termux)"})
+            r.raise_for_status()
+            root = ET.fromstring(r.content)
+            per_feed = 0
+            for item in root.findall(".//item"):
+                title = (item.findtext("title") or "").strip()
+                if title and len(title) > 10 and "<" not in title:
+                    hasil.append(f"{label}: {title}")
+                    per_feed += 1
+                if per_feed >= 2 or len(hasil) >= maks:   # maks 2 per feed
+                    break
+            tampilkan_status(f"Berita {label} OK ({per_feed} item).", "sukses")
+        except Exception as e:
+            tampilkan_status(f"RSS {label} gagal: {e}", "peringatan")
+            continue
+    return hasil
+
 
 def _berita_newsapi(api_key: str, jumlah: int) -> list | None:
     """Ambil berita dari NewsAPI. Return list atau None jika gagal."""
@@ -191,45 +237,30 @@ def _berita_newsapi(api_key: str, jumlah: int) -> list | None:
         return None
 
 
-def _berita_rss(jumlah: int) -> list:
-    """Ambil berita dari RSS feed Indonesia (gratis, tanpa API key)."""
-    feeds = [
-        ("Kompas",   "https://rss.kompas.com/nasional/feed"),
-        ("CNN-ID",   "https://www.cnnindonesia.com/rss"),
-        ("Detik",    "https://rss.detik.com/index.php/detikcom"),
-        ("Tempo",    "https://rss.tempo.co/"),
-        ("Liputan6", "https://rss.liputan6.com/rss/tag/berita-terkini"),
-    ]
-    items = []
-    for nama_feed, url in feeds:
-        if len(items) >= jumlah:
-            break
-        try:
-            r = requests.get(url, timeout=TIMEOUT_API,
-                             headers={"User-Agent": "Friday/4.0 (Termux)"})
-            r.raise_for_status()
-            root = ET.fromstring(r.content)
-            for item in root.findall(".//item"):
-                title = (item.findtext("title") or "").strip()
-                # Buang judul yang terlalu pendek atau berisi HTML
-                if title and len(title) > 10 and "<" not in title:
-                    items.append(title)
-                if len(items) >= jumlah:
-                    break
-            tampilkan_status(f"Berita dari {nama_feed} berhasil.", "sukses")
-        except Exception as e:
-            tampilkan_status(f"RSS {nama_feed} gagal: {e}", "peringatan")
-            continue
-    return items[:jumlah] if items else ["Berita tidak tersedia saat ini."]
-
-
-def dapatkan_berita(api_key: str, jumlah: int = 4) -> list:
+def dapatkan_berita(api_key: str, jumlah: int = 6) -> list:
     """
-    Return list judul berita. Fallback: NewsAPI → RSS Indonesia.
-    Interface sama seperti sebelumnya.
+    Return list judul berita campuran Indonesia + internasional.
+    Fallback: NewsAPI → RSS otomatis.
     """
     hasil = _berita_newsapi(api_key, jumlah)
-    if not hasil:
-        tampilkan_status("Mengambil berita dari RSS Indonesia...", "info")
-        hasil = _berita_rss(jumlah)
-    return hasil
+    if hasil:
+        return hasil
+
+    tampilkan_status("Mengambil berita campuran Indonesia + Internasional...", "info")
+    setengah = max(2, jumlah // 2)
+
+    id_items   = _ambil_rss(_FEEDS_ID,   setengah)
+    intl_items = _ambil_rss(_FEEDS_INTL, jumlah - len(id_items))
+
+    # Campurkan: selang-seling lokal & internasional
+    gabung = []
+    i_id, i_intl = 0, 0
+    while len(gabung) < jumlah:
+        if i_id < len(id_items):
+            gabung.append(id_items[i_id]); i_id += 1
+        if i_intl < len(intl_items) and len(gabung) < jumlah:
+            gabung.append(intl_items[i_intl]); i_intl += 1
+        if i_id >= len(id_items) and i_intl >= len(intl_items):
+            break
+
+    return gabung[:jumlah] if gabung else ["Berita tidak tersedia saat ini."]

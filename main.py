@@ -320,7 +320,7 @@ def update_cache_data():
     cd = dapatkan_cuaca_data(config.API_KEY_CUACA, config.KOTA_CUACA)
     state["cache_cuaca"]     = dapatkan_cuaca(config.API_KEY_CUACA, config.KOTA_CUACA)
     state["cache_cuaca_data"] = cd
-    state["cache_berita"]    = dapatkan_berita(config.API_KEY_BERITA, jumlah=4)
+    state["cache_berita"]    = dapatkan_berita(config.API_KEY_BERITA, jumlah=6)
     refresh_dashboard(
         waktu=state["cache_waktu"],
         cuaca=state["cache_cuaca"],
