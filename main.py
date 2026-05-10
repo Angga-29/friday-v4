@@ -44,6 +44,7 @@ from modules.wake_word   import WakeWordDetector
 from modules.penglihatan import perlu_penglihatan, deskripsikan_pemandangan
 from modules.proaktif    import ModeProaktif
 from modules.riset       import perlu_riset, riset_mendalam
+from modules.dashboard   import buka_dashboard, refresh_dashboard, update_data as dashboard_update
 from skills              import SkillManager
 
 # Import modul kamera & wajah — opsional (tidak crash jika tidak tersedia)
@@ -202,6 +203,11 @@ def inisialisasi_semua():
             "MODE SUARA SAJA: Panggil 'Hai Friday' untuk mulai berbicara.", "info"
         )
 
+    # Buka web dashboard di Chrome — generate dulu dengan data nama
+    dashboard_update(nama=config.NAMA_PENGGUNA)
+    tampilkan_status("Membuka dashboard JARVIS di browser...", "info")
+    buka_dashboard()
+
     return ai, pengenal, memori, wake_detector, proaktif, skill_manager
 
 
@@ -313,6 +319,12 @@ def update_cache_data():
     state["cache_waktu"]  = dapatkan_waktu()
     state["cache_cuaca"]  = dapatkan_cuaca(config.API_KEY_CUACA, config.KOTA_CUACA)
     state["cache_berita"] = dapatkan_berita(config.API_KEY_BERITA, jumlah=3)
+    # Refresh HTML dashboard — Chrome akan auto-reload setiap 60 detik
+    refresh_dashboard(
+        waktu=state["cache_waktu"],
+        cuaca=state["cache_cuaca"],
+        berita=state["cache_berita"],
+    )
 
 
 # ==============================================================
