@@ -34,8 +34,9 @@ from modules.tampilan    import (
     pop_up_berita, tampilkan_browsing, tampilkan_vision,
     tampilkan_statistik, tampilkan_app_dibuka, tampilkan_musik
 )
-from modules.suara       import bicara
+from modules.suara       import bicara, _sedang_bicara as _tts_event
 from modules.pendengar   import dengarkan
+from modules.tepuk       import DetektorTepuk
 from modules.info        import dapatkan_waktu, dapatkan_cuaca, dapatkan_cuaca_data, dapatkan_berita
 from modules.gemini_ai   import GeminiAI
 from modules.browser     import perlu_browsing, cari_web, format_untuk_gemini
@@ -185,6 +186,13 @@ def inisialisasi_semua():
     wake_detector = WakeWordDetector(callback_terdeteksi=on_wake_word)
     wake_detector.mulai()
 
+    # 7b. Double Clap Detector (background thread — alternatif wake word)
+    clap_detector = DetektorTepuk(
+        callback=on_wake_word,
+        sedang_bicara=_tts_event,
+    )
+    clap_detector.mulai()
+
     # 8. Mode Proaktif + Morning Digest (OpenJarvis Morning Digest Agent)
     proaktif = ModeProaktif(
         callback_bicara=bicara,
@@ -208,7 +216,7 @@ def inisialisasi_semua():
     tampilkan_status("Membuka dashboard JARVIS di browser...", "info")
     buka_dashboard()
 
-    return ai, pengenal, memori, wake_detector, proaktif, skill_manager
+    return ai, pengenal, memori, wake_detector, proaktif, skill_manager, clap_detector
 
 
 # ==============================================================
@@ -333,7 +341,7 @@ def update_cache_data():
 # LOOP UTAMA
 # ==============================================================
 def jalankan():
-    ai, pengenal, memori, wake_detector, proaktif, skill_manager = inisialisasi_semua()
+    ai, pengenal, memori, wake_detector, proaktif, skill_manager, clap_detector = inisialisasi_semua()
 
     update_cache_data()
 
@@ -483,6 +491,7 @@ def jalankan():
 
     finally:
         wake_detector.hentikan()
+        clap_detector.hentikan()
         proaktif.hentikan()
         memori.tutup()
         tutup_dashboard()
