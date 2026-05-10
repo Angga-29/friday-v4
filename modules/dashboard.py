@@ -1,32 +1,34 @@
 # ==============================================================
 # modules/dashboard.py — Project Friday | Web Dashboard JARVIS
-# Versi : 1.0.0 — HTML dashboard otomatis di Chrome/browser
+# Versi : 1.1.0 — HTTP server lokal (fix Chrome blokir file://)
 # ==============================================================
 """
 Cara kerja:
-  1. Friday generate file HTML lengkap ke TMPDIR/friday_dashboard.html
-  2. Buka file tersebut di Chrome via am start / termux-open-url
-  3. HTML berisi data cuaca, berita, waktu — auto-refresh setiap 60 detik
-  4. Setiap kali Friday update data, HTML di-generate ulang → Chrome refresh
+  1. Friday jalankan mini HTTP server di background thread (port 8765)
+  2. Setiap request → kirim HTML terbaru
+  3. Chrome dibuka ke http://localhost:8765
+  4. HTML auto-refresh setiap 30 detik → selalu data terbaru
 """
 
 import os
+import threading
 import subprocess
-import json
 from datetime import datetime
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
-_TMPDIR    = os.environ.get("TMPDIR") or "/tmp"
-HTML_PATH  = os.path.join(_TMPDIR, "friday_dashboard.html")
-STATE_PATH = os.path.join(_TMPDIR, "friday_state.json")
+PORT = 8765
+_TMPDIR = os.environ.get("TMPDIR") or "/tmp"
 
 _data = {
-    "nama"   : "Angga",
-    "waktu"  : "",
-    "cuaca"  : "",
-    "berita" : [],
-    "status" : "Standby",
+    "nama"     : "Angga",
+    "waktu"    : "",
+    "cuaca"    : "",
+    "berita"   : [],
+    "status"   : "Standby",
     "aktivitas": "",
 }
+_server_started = False
+_server_lock    = threading.Lock()
 
 
 def update_data(nama="", waktu="", cuaca="", berita=None,
@@ -41,8 +43,8 @@ def update_data(nama="", waktu="", cuaca="", berita=None,
     _generate_html()
 
 
-def _generate_html():
-    """Buat file HTML lengkap dengan data terkini."""
+def _generate_html() -> str:
+    """Return HTML dashboard terbaru — dipanggil tiap request HTTP."""
     nama     = _data.get("nama", "Angga")
     waktu    = _data.get("waktu", datetime.now().strftime("%H:%M"))
     cuaca    = _data.get("cuaca", "—")
@@ -413,34 +415,65 @@ def _generate_html():
 </body>
 </html>"""
 
-    try:
-        with open(HTML_PATH, "w", encoding="utf-8") as f:
-            f.write(html)
-    except Exception:
-        pass
+    return html
+
+
+class _Handler(BaseHTTPRequestHandler):
+    """Serve HTML dashboard untuk setiap request GET."""
+    def do_GET(self):
+        html = _generate_html().encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(html)))
+        self.end_headers()
+        self.wfile.write(html)
+
+    def log_message(self, *args):
+        pass   # Matikan log bawaan HTTPServer agar tidak spam terminal
+
+
+def _start_server():
+    """Jalankan HTTP server di thread daemon — otomatis mati saat main.py berhenti."""
+    global _server_started
+    with _server_lock:
+        if _server_started:
+            return
+        try:
+            server = HTTPServer(("127.0.0.1", PORT), _Handler)
+            _server_started = True
+            t = threading.Thread(target=server.serve_forever, daemon=True)
+            t.start()
+        except OSError:
+            # Port sudah dipakai — server mungkin sudah jalan
+            _server_started = True
 
 
 def buka_dashboard():
-    """Generate HTML lalu buka di Chrome/browser."""
-    _generate_html()
+    """Start HTTP server lalu buka http://localhost:PORT di Chrome."""
+    _start_server()
 
-    url = f"file://{HTML_PATH}"
+    import time
+    time.sleep(0.5)   # beri server waktu bind
 
-    # Metode 1: am start ke Chrome langsung
-    for cmd in [
+    url = f"http://localhost:{PORT}"
+
+    cmds = [
+        # Chrome — package name yang umum di Android
         ["am", "start", "-a", "android.intent.action.VIEW",
          "-d", url, "-p", "com.android.chrome"],
         ["am", "start", "-a", "android.intent.action.VIEW",
          "-d", url, "-p", "com.google.android.apps.chrome"],
-        # Metode 2: termux-open-url (buka di browser default)
+        # Browser default via termux-open-url
         ["termux-open-url", url],
-        # Metode 3: xdg-open
+        # xdg-open fallback
         ["xdg-open", url],
-    ]:
+    ]
+
+    for cmd in cmds:
         try:
-            ret = subprocess.Popen(cmd,
-                                   stdout=subprocess.DEVNULL,
-                                   stderr=subprocess.DEVNULL)
+            subprocess.Popen(cmd,
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
             return True
         except FileNotFoundError:
             continue
@@ -449,6 +482,6 @@ def buka_dashboard():
 
 
 def refresh_dashboard(waktu="", cuaca="", berita=None, status="", aktivitas=""):
-    """Update data dan regenerate HTML — Chrome akan auto-refresh."""
+    """Update data — server otomatis sajikan HTML terbaru di request berikutnya."""
     update_data(waktu=waktu, cuaca=cuaca, berita=berita,
                 status=status, aktivitas=aktivitas)
