@@ -381,3 +381,14 @@ def refresh_dashboard(waktu="", cuaca="", berita=None, status="", aktivitas=""):
     """Update data — server otomatis sajikan HTML terbaru di request berikutnya."""
     update_data(waktu=waktu, cuaca=cuaca, berita=berita,
                 status=status, aktivitas=aktivitas)
+
+
+def tutup_dashboard():
+    """Tutup Chrome dan hentikan HTTP server saat Friday dimatikan."""
+    # Tutup Chrome (coba kedua package name)
+    for pkg in ("com.android.chrome", "com.google.android.apps.chrome"):
+        try:
+            subprocess.run(["am", "force-stop", pkg],
+                           capture_output=True, timeout=5)
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass

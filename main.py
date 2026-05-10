@@ -44,7 +44,7 @@ from modules.wake_word   import WakeWordDetector
 from modules.penglihatan import perlu_penglihatan, deskripsikan_pemandangan
 from modules.proaktif    import ModeProaktif
 from modules.riset       import perlu_riset, riset_mendalam
-from modules.dashboard   import buka_dashboard, refresh_dashboard, update_data as dashboard_update
+from modules.dashboard   import buka_dashboard, refresh_dashboard, update_data as dashboard_update, tutup_dashboard
 from skills              import SkillManager
 
 # Import modul kamera & wajah — opsional (tidak crash jika tidak tersedia)
@@ -483,6 +483,7 @@ def jalankan():
         wake_detector.hentikan()
         proaktif.hentikan()
         memori.tutup()
+        tutup_dashboard()
         tampilkan_divider()
         tampilkan_status("Friday berhasil dimatikan. Memori tersimpan.", "sukses")
 
