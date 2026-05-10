@@ -20,39 +20,55 @@ PORT = 8765
 _TMPDIR = os.environ.get("TMPDIR") or "/tmp"
 
 _data = {
-    "nama"     : "Angga",
-    "waktu"    : "",
-    "cuaca"    : "",
-    "berita"   : [],
-    "status"   : "Standby",
-    "aktivitas": "",
+    "nama"       : "Angga",
+    "waktu"      : "",
+    "cuaca"      : "",        # string untuk diucapkan
+    "cuaca_data" : {},        # dict: suhu, kondisi, kelembaban, ikon, nama
+    "berita"     : [],
+    "status"     : "Standby",
+    "aktivitas"  : "",
 }
 _server_started = False
 _server_lock    = threading.Lock()
 
 
-def update_data(nama="", waktu="", cuaca="", berita=None,
-                status="", aktivitas=""):
-    """Perbarui data dashboard dan regenerate HTML."""
-    if nama:      _data["nama"]      = nama
-    if waktu:     _data["waktu"]     = waktu
-    if cuaca:     _data["cuaca"]     = cuaca
-    if berita is not None: _data["berita"] = berita
-    if status:    _data["status"]    = status
-    if aktivitas: _data["aktivitas"] = aktivitas
+def update_data(nama="", waktu="", cuaca="", cuaca_data=None,
+                berita=None, status="", aktivitas=""):
+    """Perbarui data dashboard."""
+    if nama:                    _data["nama"]       = nama
+    if waktu:                   _data["waktu"]      = waktu
+    if cuaca:                   _data["cuaca"]      = cuaca
+    if cuaca_data is not None:  _data["cuaca_data"] = cuaca_data
+    if berita is not None:      _data["berita"]     = berita
+    if status:                  _data["status"]     = status
+    if aktivitas:               _data["aktivitas"]  = aktivitas
 
 
 def _generate_html() -> str:
     """Return HTML dashboard JARVIS Iron Man style — dipanggil tiap request HTTP."""
     nama    = _data.get("nama", "Angga")
-    cuaca   = _data.get("cuaca", "Memuat...")
     berita  = _data.get("berita", [])
     status  = _data.get("status", "Standby")
     updated = datetime.now().strftime("%H:%M:%S")
 
+    # Cuaca: pakai cuaca_data jika tersedia, fallback ke text
+    cd      = _data.get("cuaca_data", {})
+    c_suhu  = cd.get("suhu", "--")
+    c_rasa  = cd.get("rasa", "--")
+    c_lembab= cd.get("kelembaban", "--")
+    c_kond  = cd.get("kondisi", _data.get("cuaca", "Memuat..."))
+    c_ikon  = cd.get("ikon", "🌡️")
+    c_kota  = cd.get("nama", "")
+
     berita_items = ""
     for i, b in enumerate(berita[:4], 1):
-        berita_items += f'<div class="news-row"><span class="n-idx">0{i}</span><span class="n-txt">{b}</span></div>'
+        judul = (b[:80] + "…") if len(b) > 80 else b
+        berita_items += (
+            f'<div class="news-row">'
+            f'<span class="n-idx">0{i}</span>'
+            f'<span class="n-txt">{judul}</span>'
+            f'</div>'
+        )
     if not berita_items:
         berita_items = '<div class="news-row"><span class="n-idx">--</span><span class="n-txt">Menghubungi server berita...</span></div>'
 
@@ -219,10 +235,17 @@ body::after{{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 
   <!-- Cuaca -->
   <div class="card" style="margin-bottom:10px;">
-    <div class="ctitle">◈ KONDISI CUACA</div>
-    <div class="weather-v">{cuaca}</div>
-    <div class="pbar-wrap">
-      <div class="pbar"><div class="pbar-fill"></div></div>
+    <div class="ctitle">◈ KONDISI CUACA — {c_kota.upper() or "---"}</div>
+    <div style="display:flex;align-items:center;gap:14px;margin:6px 0;">
+      <div style="font-size:44px;line-height:1;">{c_ikon}</div>
+      <div>
+        <div style="font-family:'Orbitron',monospace;font-size:36px;font-weight:700;color:#fff;text-shadow:0 0 20px rgba(0,229,255,0.8);line-height:1;">{c_suhu}<span style="font-size:18px;">°C</span></div>
+        <div style="font-size:10px;color:rgba(0,229,255,0.5);margin-top:2px;">TERASA {c_rasa}°C</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#e0f7fa;margin-bottom:6px;">{c_kond}</div>
+    <div style="display:flex;gap:16px;font-size:9px;color:rgba(0,229,255,0.5);">
+      <span>💧 KELEMBABAN {c_lembab}%</span>
     </div>
   </div>
 
@@ -377,10 +400,11 @@ def buka_dashboard():
     return False
 
 
-def refresh_dashboard(waktu="", cuaca="", berita=None, status="", aktivitas=""):
+def refresh_dashboard(waktu="", cuaca="", cuaca_data=None,
+                      berita=None, status="", aktivitas=""):
     """Update data — server otomatis sajikan HTML terbaru di request berikutnya."""
-    update_data(waktu=waktu, cuaca=cuaca, berita=berita,
-                status=status, aktivitas=aktivitas)
+    update_data(waktu=waktu, cuaca=cuaca, cuaca_data=cuaca_data,
+                berita=berita, status=status, aktivitas=aktivitas)
 
 
 def tutup_dashboard():

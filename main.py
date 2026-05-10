@@ -36,7 +36,7 @@ from modules.tampilan    import (
 )
 from modules.suara       import bicara
 from modules.pendengar   import dengarkan
-from modules.info        import dapatkan_waktu, dapatkan_cuaca, dapatkan_berita
+from modules.info        import dapatkan_waktu, dapatkan_cuaca, dapatkan_cuaca_data, dapatkan_berita
 from modules.gemini_ai   import GeminiAI
 from modules.browser     import perlu_browsing, cari_web, format_untuk_gemini
 from modules.memori      import MemoriFriday
@@ -316,13 +316,15 @@ def proses_jawaban(suara_user, ai, memori, skill_manager):
 # UPDATE CACHE DATA REAL-TIME
 # ==============================================================
 def update_cache_data():
-    state["cache_waktu"]  = dapatkan_waktu()
-    state["cache_cuaca"]  = dapatkan_cuaca(config.API_KEY_CUACA, config.KOTA_CUACA)
-    state["cache_berita"] = dapatkan_berita(config.API_KEY_BERITA, jumlah=3)
-    # Refresh HTML dashboard — Chrome akan auto-reload setiap 60 detik
+    state["cache_waktu"]     = dapatkan_waktu()
+    cd = dapatkan_cuaca_data(config.API_KEY_CUACA, config.KOTA_CUACA)
+    state["cache_cuaca"]     = dapatkan_cuaca(config.API_KEY_CUACA, config.KOTA_CUACA)
+    state["cache_cuaca_data"] = cd
+    state["cache_berita"]    = dapatkan_berita(config.API_KEY_BERITA, jumlah=4)
     refresh_dashboard(
         waktu=state["cache_waktu"],
         cuaca=state["cache_cuaca"],
+        cuaca_data=cd,
         berita=state["cache_berita"],
     )
 
