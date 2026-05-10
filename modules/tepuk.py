@@ -114,20 +114,8 @@ class DetektorTepuk:
                 amp  = self._rms(data)
                 now  = time.time()
 
-                tts_aktif = self._sedang_bicara and self._sedang_bicara.is_set()
-
-                # ── MODE BARGE-IN: Friday sedang bicara ──────────────
-                if tts_aktif:
-                    if self._cb_interrupt and amp >= THRESHOLD_INTERRUPT:
-                        if now - self._last_interrupt > COOLDOWN_INTERRUPT:
-                            self._last_interrupt = now
-                            tampilkan_status(
-                                "👏 Tepukan! Menghentikan Friday...", "deteksi"
-                            )
-                            try:
-                                self._cb_interrupt()
-                            except Exception:
-                                pass
+                # ── Skip saat Friday sedang bicara (anti-false-trigger) ──
+                if self._sedang_bicara and self._sedang_bicara.is_set():
                     time.sleep(0.05)
                     continue
 

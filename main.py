@@ -190,7 +190,6 @@ def inisialisasi_semua():
     clap_detector = DetektorTepuk(
         callback=on_wake_word,
         sedang_bicara=_tts_event,
-        callback_interrupt=stop_bicara,   # 1x tepuk saat TTS = stop
     )
     clap_detector.mulai()
 
