@@ -15,9 +15,10 @@ TRIGGER_WORDS = [
     "putar musik", "play musik", "mainkan musik", "nyalakan musik",
     "putar spotify", "buka spotify musik", "play spotify",
     "putar lagu", "mainkan lagu",
-    # Stop
+    # Stop / Pause / Resume
     "hentikan musik", "stop musik", "matikan musik", "pause musik",
-    "berhenti musik",
+    "berhenti musik", "jeda musik", "jeda lagu",
+    "lanjutkan musik", "resume musik", "play lagi", "putar lagi",
     # Next / Prev
     "lagu berikutnya", "next lagu", "skip lagu", "ganti lagu",
     "lagu sebelumnya", "previous lagu", "lagu tadi",
@@ -56,47 +57,73 @@ def _cari_file_lokal() -> list:
     return files
 
 
-def _kirim_media_key(aksi: str) -> bool:
-    """Kirim tombol media ke Android (play/pause/next/prev)."""
-    kode = {
-        "play_pause": "85",
-        "next":       "87",
-        "previous":   "88",
+def _kontrol_media(aksi: str) -> bool:
+    """
+    Kontrol media playback Android — pause, play, next, prev.
+    Urutan: termux-media-player → input keyevent → am broadcast Spotify.
+    termux-media-player menggunakan MediaSession Android sehingga
+    langsung menjangkau Spotify tanpa perlu root.
+    """
+    # ── Metode 1: termux-media-player (terbaik — pakai MediaSession) ──
+    # Tersedia jika Termux:API terinstall (pkg install termux-api)
+    termux_cmd = {
+        "play_pause": ["termux-media-player", "play"],  # toggle
+        "pause":      ["termux-media-player", "pause"],
+        "play":       ["termux-media-player", "play"],
+        "next":       ["termux-media-player", "next"],
+        "previous":   ["termux-media-player", "previous"],
     }.get(aksi)
-    if not kode:
-        return False
 
-    # Metode 1: input keyevent
-    try:
-        ret = subprocess.run(
-            ["input", "keyevent", kode],
-            capture_output=True, timeout=3
-        )
-        if ret.returncode == 0:
-            return True
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
+    if termux_cmd:
+        try:
+            ret = subprocess.run(termux_cmd, capture_output=True, timeout=5)
+            if ret.returncode == 0:
+                return True
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
 
-    # Metode 2: am broadcast media button
-    try:
-        subprocess.run(
-            ["am", "broadcast", "-a",
-             "android.intent.action.MEDIA_BUTTON",
-             "--ei", "android.intent.extra.KEY_EVENT", kode],
-            capture_output=True, timeout=3
-        )
-        return True
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
+    # ── Metode 2: Spotify broadcast intent langsung ────────────────
+    spotify_aksi = {
+        "play_pause": "com.spotify.mobile.android.ui.widget.PLAY_PAUSE",
+        "pause":      "com.spotify.mobile.android.ui.widget.PAUSE",
+        "play":       "com.spotify.mobile.android.ui.widget.PLAY",
+        "next":       "com.spotify.mobile.android.ui.widget.NEXT",
+        "previous":   "com.spotify.mobile.android.ui.widget.PREVIOUS",
+    }.get(aksi)
+
+    if spotify_aksi:
+        try:
+            ret = subprocess.run(
+                ["am", "broadcast", "-a", spotify_aksi,
+                 "-p", "com.spotify.music"],
+                capture_output=True, timeout=5
+            )
+            if ret.returncode == 0:
+                return True
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+
+    # ── Metode 3: input keyevent (fallback terakhir) ───────────────
+    kode = {"play_pause": "85", "pause": "85", "play": "85",
+            "next": "87", "previous": "88"}.get(aksi)
+    if kode:
+        try:
+            ret = subprocess.run(
+                ["input", "keyevent", kode],
+                capture_output=True, timeout=3
+            )
+            return ret.returncode == 0
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
 
     return False
 
 
 def _atur_volume(arah: str) -> str:
     """Naikkan atau turunkan volume media Android."""
-    kode = "24" if arah == "naik" else "25"   # KEYCODE_VOLUME_UP / DOWN
+    kode = "24" if arah == "naik" else "25"
     try:
-        for _ in range(3):   # tekan 3x agar terasa
+        for _ in range(3):
             subprocess.run(["input", "keyevent", kode],
                            capture_output=True, timeout=2)
         return f"Volume {'dinaikkan' if arah == 'naik' else 'diturunkan'}."
@@ -143,26 +170,34 @@ def jalankan(teks: str, **ctx) -> Optional[str]:
         if _proses_mpv and _proses_mpv.poll() is None:
             # mpv: kirim 'q' lalu maju ke lagu berikut via playlist
             _proses_mpv.stdin and None   # mpv tidak pakai stdin di mode ini
-        _kirim_media_key("next")
+        _kontrol_media("next")
         return "Lagu selanjutnya."
 
     if any(k in teks_lower for k in
            ["sebelumnya", "previous", "lagu tadi"]):
         _tampil_musik("◀◀ Previous Track")
-        _kirim_media_key("previous")
+        _kontrol_media("previous")
         return "Kembali ke lagu sebelumnya."
 
     # ── STOP / PAUSE ──────────────────────────────────────────
     if any(k in teks_lower for k in
-           ["hentikan", "stop", "matikan musik", "pause", "berhenti"]):
+           ["hentikan", "stop", "matikan musik", "pause", "berhenti", "jeda"]):
         dihentikan = False
         if _proses_mpv and _proses_mpv.poll() is None:
             _proses_mpv.terminate()
             _proses_mpv = None
             dihentikan = True
-        _kirim_media_key("play_pause")   # pause Spotify jika sedang main
-        _tampil_musik("⏹ Stop Musik")
-        return "Musik dihentikan." if dihentikan else "Musik dijeda."
+        # Pause Spotify via MediaSession (termux-media-player pause)
+        _kontrol_media("pause")
+        _tampil_musik("⏹ Musik Dijeda")
+        return "Musik dihentikan." if dihentikan else "Spotify dijeda."
+
+    # ── LANJUTKAN / RESUME ────────────────────────────────────
+    if any(k in teks_lower for k in
+           ["lanjutkan musik", "resume musik", "play lagi", "putar lagi"]):
+        _kontrol_media("play")
+        _tampil_musik("▶ Lanjutkan Musik")
+        return "Musik dilanjutkan."
 
     # ── SPOTIFY ───────────────────────────────────────────────
     if "spotify" in teks_lower:
@@ -170,7 +205,7 @@ def jalankan(teks: str, **ctx) -> Optional[str]:
         if _buka_spotify():
             # Kirim play setelah jeda singkat
             import time; time.sleep(1.5)
-            _kirim_media_key("play_pause")
+            _kontrol_media("play_pause")
             return "Spotify dibuka dan diputar, Bos."
         return "Tidak bisa membuka Spotify. Pastikan aplikasinya terinstall."
 
@@ -181,7 +216,7 @@ def jalankan(teks: str, **ctx) -> Optional[str]:
         _tampil_musik("▶ Spotify (tidak ada musik lokal)")
         if _buka_spotify():
             import time; time.sleep(1.5)
-            _kirim_media_key("play_pause")
+            _kontrol_media("play_pause")
             return ("Tidak ada musik lokal ditemukan. "
                     "Membuka Spotify sebagai gantinya.")
         return ("Tidak ada file musik lokal. "
