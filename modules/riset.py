@@ -76,8 +76,13 @@ def riset_mendalam(teks_asli: str, ai) -> str:
         f"{konteks}\n\n"
         f"[INSTRUKSI RISET MENDALAM]\n"
         f"Topik: {topik}\n"
-        f"Buat analisis komprehensif: 1 kalimat inti, 3 kalimat detail penting, "
-        f"1 kalimat kesimpulan. Maksimal 5 kalimat total."
+        f"Buat analisis komprehensif yang bisa didengarkan: "
+        f"mulai dengan fakta terpenting, lanjutkan dengan 3 poin detail kunci, "
+        f"akhiri dengan kesimpulan singkat. "
+        f"Gunakan bahasa natural tanpa bullet point. Maksimal 6 kalimat."
     )
 
+    # Gunakan tanya_riset() yang punya token limit lebih besar
+    if hasattr(ai, 'tanya_riset'):
+        return ai.tanya_riset(prompt)
     return ai.tanya_dengan_web(topik, prompt)

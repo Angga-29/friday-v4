@@ -5,9 +5,10 @@
 
 from modules.tampilan import tampilkan_status, tampilkan_memproses
 
-MODEL_UTAMA   = "gemini-2.5-flash"
+MODEL_UTAMA    = "gemini-2.5-flash"
 MODEL_FALLBACK = "gemini-1.5-flash"
-MAX_TOKENS    = 500
+MAX_TOKENS     = 600    # chat & browsing
+MAX_TOKENS_RISET = 1200  # riset mendalam — butuh lebih banyak ruang
 
 # Deteksi SDK yang tersedia: google-generativeai (lama) atau google-genai (baru)
 _SDK_MODE = None
@@ -201,6 +202,41 @@ class GeminiAI:
         if not self._terhubung:
             return "Maaf, koneksi ke AI bermasalah."
         return self.tanya(konteks_web)
+
+    def tanya_riset(self, perintah: str) -> str:
+        """Sama seperti tanya() tapi dengan token limit lebih besar untuk riset mendalam."""
+        if not self._terhubung:
+            return "Maaf, koneksi ke AI bermasalah."
+        tampilkan_memproses()
+        try:
+            if _SDK_MODE == "generativeai":
+                # Buat model sementara dengan token lebih besar
+                gen_cfg = {"max_output_tokens": MAX_TOKENS_RISET,
+                           "temperature": 0.7, "top_p": 0.95}
+                import google.generativeai as _g
+                model_r = _g.GenerativeModel(
+                    model_name=getattr(self, '_active_model_name', MODEL_UTAMA),
+                    system_instruction=self.system_prompt,
+                    generation_config=gen_cfg,
+                )
+                chat_r = model_r.start_chat(history=[])
+                return self._bersihkan(chat_r.send_message(perintah).text)
+            else:
+                from google.genai import types
+                contents = [{"role": "user", "parts": [perintah]}]
+                resp = self._client.models.generate_content(
+                    model=self._model_name,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        system_instruction=self._system,
+                        max_output_tokens=MAX_TOKENS_RISET,
+                        temperature=0.7,
+                    ),
+                )
+                return self._bersihkan(resp.text)
+        except Exception as e:
+            tampilkan_status(f"Error riset Gemini: {e}", "error")
+            return self.tanya(perintah)   # fallback ke tanya biasa
 
     def reset_sesi(self) -> None:
         if _SDK_MODE == "generativeai" and self.model:

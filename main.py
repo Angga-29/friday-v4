@@ -38,6 +38,8 @@ from modules.suara       import bicara, stop_bicara, _sedang_bicara as _tts_even
 from modules.pendengar   import dengarkan
 from modules.tepuk       import DetektorTepuk
 from modules.info        import dapatkan_waktu, dapatkan_cuaca, dapatkan_cuaca_data, dapatkan_berita
+
+INTERVAL_REFRESH_DATA = 1800   # detik — refresh cuaca+berita otomatis setiap 30 menit
 from modules.gemini_ai   import GeminiAI
 from modules.browser     import perlu_browsing, cari_web, format_untuk_gemini
 from modules.memori      import MemoriFriday
@@ -90,6 +92,7 @@ state = {
     "ai"              : None,
     "memori"          : None,
     "skill_manager"   : None,
+    "status_sistem"   : "Standby",   # status real-time untuk dashboard
     "frame_terakhir"  : None,
     "cache_waktu"     : "",
     "cache_cuaca"     : "",
@@ -101,8 +104,37 @@ state = {
 # ==============================================================
 # CALLBACK WAKE WORD
 # ==============================================================
-def on_wake_word(teks_terdeteksi):
+def on_wake_word(teks_terdeteksi=None):
     state["wake_triggered"] = True
+
+
+# ==============================================================
+# HELPER STATUS — update dashboard + Termux display sekaligus
+# ==============================================================
+def set_status(status: str):
+    """Update status sistem di dashboard Chrome dan state global."""
+    state["status_sistem"] = status
+    try:
+        from modules.dashboard import update_data as _du
+        _du(status=status)
+    except Exception:
+        pass
+
+
+# ==============================================================
+# REFRESH PERIODIK — background thread, setiap 30 menit
+# ==============================================================
+def _mulai_refresh_periodik():
+    def _loop():
+        while True:
+            time.sleep(INTERVAL_REFRESH_DATA)
+            tampilkan_status("Refresh data otomatis (30 menit)...", "info")
+            try:
+                update_cache_data()
+            except Exception as e:
+                tampilkan_status(f"Refresh periodik gagal: {e}", "peringatan")
+    t = threading.Thread(target=_loop, daemon=True, name="PeriodicRefresh")
+    t.start()
 
 
 # ==============================================================
@@ -211,11 +243,15 @@ def inisialisasi_semua():
             "MODE SUARA SAJA: Panggil 'Hai Friday' untuk mulai berbicara.", "info"
         )
 
-    # Buka web dashboard di Chrome — generate dulu dengan data nama
+    # Buka web dashboard di Chrome
     dashboard_update(nama=config.NAMA_PENGGUNA)
-    set_stop_callback(stop_bicara)   # daftarkan endpoint /stop
+    set_stop_callback(stop_bicara)
     tampilkan_status("Membuka dashboard JARVIS di browser...", "info")
     buka_dashboard()
+
+    # Mulai refresh data otomatis setiap 30 menit
+    _mulai_refresh_periodik()
+    tampilkan_status("Refresh data otomatis setiap 30 menit aktif.", "info")
 
     return ai, pengenal, memori, wake_detector, proaktif, skill_manager, clap_detector
 
@@ -230,95 +266,107 @@ def proses_jawaban(suara_user, ai, memori, skill_manager):
     cache_cuaca  = state["cache_cuaca"]
     cache_berita = state["cache_berita"]
 
-    # ── 1. PERINTAH KELUAR ───────────────────────────────────────
-    if any(k in teks_lower for k in ["keluar", "matikan friday", "istirahat friday"]):
-        bicara(f"Baik, Bos {config.NAMA_PENGGUNA}. Sampai jumpa!")
-        return True
+    set_status("Memproses")
 
-    # ── 2. RESET SESI ────────────────────────────────────────────
-    if "reset" in teks_lower and "sesi" in teks_lower:
-        ai.reset_sesi()
-        bicara("Sesi percakapan direset.")
-        return False
+    try:
+        # ── 1. PERINTAH KELUAR ───────────────────────────────────────
+        if any(k in teks_lower for k in ["keluar", "matikan friday", "istirahat friday"]):
+            bicara(f"Baik, Bos {config.NAMA_PENGGUNA}. Sampai jumpa!")
+            return True
 
-    # ── 3. STATISTIK ─────────────────────────────────────────────
-    if "statistik" in teks_lower:
-        stats = memori.statistik_hari_ini()
-        tampilkan_statistik(stats)
-        bicara(
-            f"Hari ini: {stats['interaksi']} interaksi, "
-            f"{stats['browsing']} browsing, "
-            f"{stats['skill']} skill, "
-            f"{stats['riset']} riset mendalam."
+        # ── 2. RESET SESI ────────────────────────────────────────────
+        if "reset" in teks_lower and "sesi" in teks_lower:
+            ai.reset_sesi()
+            bicara("Sesi percakapan direset.")
+            return False
+
+        # ── 3. STATISTIK ─────────────────────────────────────────────
+        if "statistik" in teks_lower:
+            stats = memori.statistik_hari_ini()
+            tampilkan_statistik(stats)
+            bicara(
+                f"Hari ini: {stats['interaksi']} interaksi, "
+                f"{stats['browsing']} browsing, "
+                f"{stats['skill']} skill, "
+                f"{stats['riset']} riset mendalam."
+            )
+            return False
+
+        # ── 4. SIMPAN PREFERENSI ─────────────────────────────────────
+        if teks_lower.startswith(("ingat bahwa", "ingat kalau", "tolong ingat")):
+            info = suara_user.split(maxsplit=2)[-1] if len(suara_user.split()) > 2 else suara_user
+            memori.simpan_preferensi(f"catatan_{int(time.time())}", info)
+            bicara(f"Saya catat: {info}")
+            return False
+
+        # ── 5. SKILLS (lokal — lebih cepat dari Gemini) ──────────────
+        hasil_skill = skill_manager.cari_dan_jalankan(
+            suara_user, callback_bicara=bicara,
         )
-        return False
+        if hasil_skill is not None:
+            tampilkan_status("Dijawab oleh skill lokal.", "sukses")
+            bicara(hasil_skill)
+            memori.simpan_percakapan(suara_user, hasil_skill, tipe="skill")
+            memori.catat_interaksi("skill")
+            return False
 
-    # ── 4. SIMPAN PREFERENSI ─────────────────────────────────────
-    if teks_lower.startswith(("ingat bahwa", "ingat kalau", "tolong ingat")):
-        info = suara_user.split(maxsplit=2)[-1] if len(suara_user.split()) > 2 else suara_user
-        memori.simpan_preferensi(f"catatan_{int(time.time())}", info)
-        bicara(f"Saya catat: {info}")
-        return False
+        # ── 6. RISET MENDALAM ────────────────────────────────────────
+        if perlu_riset(suara_user):
+            set_status("Riset")
+            tampilkan_status("Mode riset mendalam aktif.", "browsing")
+            bicara("Baik, saya akan melakukan riset mendalam. Mohon tunggu sebentar.")
+            jawaban = riset_mendalam(suara_user, ai)
+            bicara(jawaban)
+            memori.simpan_percakapan(suara_user, jawaban, pakai_web=True, tipe="riset")
+            memori.catat_interaksi("riset")
+            return False
 
-    # ── 5. SKILLS (OpenJarvis-inspired lokal execution) ──────────
-    hasil_skill = skill_manager.cari_dan_jalankan(
-        suara_user,
-        callback_bicara=bicara,
-    )
-    if hasil_skill is not None:
-        tampilkan_status("Dijawab oleh skill lokal.", "sukses")
-        bicara(hasil_skill)
-        memori.simpan_percakapan(suara_user, hasil_skill, tipe="skill")
-        memori.catat_interaksi("skill")
-        return False
+        # ── 7. VISION ────────────────────────────────────────────────
+        if perlu_penglihatan(suara_user):
+            set_status("Vision")
+            tampilkan_vision()
+            jawaban = deskripsikan_pemandangan(
+                state["frame_terakhir"], suara_user, config.API_KEY_GEMINI
+            )
+            bicara(jawaban)
+            memori.simpan_percakapan(suara_user, jawaban, pakai_web=False, tipe="vision")
+            return False
 
-    # ── 6. RISET MENDALAM (OpenJarvis Research Agent) ────────────
-    if perlu_riset(suara_user):
-        tampilkan_status("Mode riset mendalam aktif.", "browsing")
-        bicara("Baik, saya akan melakukan riset mendalam. Mohon tunggu sebentar.")
-        jawaban = riset_mendalam(suara_user, ai)
-        bicara(jawaban)
-        memori.simpan_percakapan(suara_user, jawaban, pakai_web=True, tipe="riset")
-        memori.catat_interaksi("riset")
-        return False
+        # ── 8. BROWSING ──────────────────────────────────────────────
+        if perlu_browsing(suara_user):
+            set_status("Browsing")
+            tampilkan_status("Pertanyaan perlu browsing.", "browsing")
+            bicara("Baik, saya carikan dari internet.")
+            tampilkan_browsing(suara_user)
+            hasil_web    = cari_web(suara_user)
+            konteks_web  = format_untuk_gemini(suara_user, hasil_web)
+            konteks_penuh = (
+                f"[KONTEKS]\nWaktu: {cache_waktu}\nCuaca: {cache_cuaca}\n\n"
+                + konteks_web
+            )
+            jawaban = ai.tanya_dengan_web(suara_user, konteks_penuh)
+            bicara(jawaban)
+            memori.simpan_percakapan(suara_user, jawaban, pakai_web=True, tipe="browsing")
+            memori.catat_interaksi("browsing")
+            return False
 
-    # ── 7. VISION (Gemini lihat kamera) ──────────────────────────
-    if perlu_penglihatan(suara_user):
-        tampilkan_vision()
-        jawaban = deskripsikan_pemandangan(
-            state["frame_terakhir"], suara_user, config.API_KEY_GEMINI
+        # ── 9. GEMINI CHAT (fallback utama) ──────────────────────────
+        perintah = ai.bangun_konteks(
+            suara_user=suara_user, waktu=cache_waktu,
+            cuaca=cache_cuaca, berita=cache_berita
         )
+        jawaban = ai.tanya(perintah)
         bicara(jawaban)
-        memori.simpan_percakapan(suara_user, jawaban, pakai_web=False, tipe="vision")
+        memori.simpan_percakapan(suara_user, jawaban, tipe="chat")
+        memori.catat_interaksi("interaksi")
         return False
 
-    # ── 8. BROWSING (pencarian web cepat) ────────────────────────
-    if perlu_browsing(suara_user):
-        tampilkan_status("Pertanyaan perlu browsing.", "browsing")
-        bicara("Baik, saya carikan dari internet.")
-        tampilkan_browsing(suara_user)
-        hasil_web    = cari_web(suara_user)
-        konteks_web  = format_untuk_gemini(suara_user, hasil_web)
-        konteks_penuh = (
-            f"[KONTEKS]\nWaktu: {cache_waktu}\nCuaca: {cache_cuaca}\n\n"
-            + konteks_web
-        )
-        jawaban = ai.tanya_dengan_web(suara_user, konteks_penuh)
-        bicara(jawaban)
-        memori.simpan_percakapan(suara_user, jawaban, pakai_web=True, tipe="browsing")
-        memori.catat_interaksi("browsing")
+    except Exception as e:
+        tampilkan_status(f"Error proses jawaban: {e}", "error")
+        bicara("Maaf, ada gangguan sebentar. Silakan ulangi.")
         return False
-
-    # ── 9. GEMINI CHAT (fallback utama) ──────────────────────────
-    perintah = ai.bangun_konteks(
-        suara_user=suara_user, waktu=cache_waktu,
-        cuaca=cache_cuaca, berita=cache_berita
-    )
-    jawaban = ai.tanya(perintah)
-    bicara(jawaban)
-    memori.simpan_percakapan(suara_user, jawaban, tipe="chat")
-    memori.catat_interaksi("interaksi")
-    return False
+    finally:
+        set_status("Standby")
 
 
 # ==============================================================
@@ -376,7 +424,10 @@ def jalankan():
                     if not state["cache_cuaca"]:
                         update_cache_data()
 
+                    set_status("Mendengarkan")
                     suara_user = dengarkan(setelah_tts=True)
+                    set_status("Standby")
+
                     if suara_user:
                         if proses_jawaban(suara_user, ai, memori, skill_manager):
                             break
@@ -410,7 +461,10 @@ def jalankan():
                     if not state["cache_cuaca"]:
                         update_cache_data()
 
+                    set_status("Mendengarkan")
                     suara_user = dengarkan(setelah_tts=True)
+                    set_status("Standby")
+
                     if suara_user:
                         if proses_jawaban(suara_user, ai, memori, skill_manager):
                             break
@@ -468,7 +522,10 @@ def jalankan():
                         )
 
                     # ── 6. DENGARKAN ─────────────────────────────────
+                    set_status("Mendengarkan")
                     suara_user = dengarkan(setelah_tts=True)
+                    set_status("Standby")
+
                     if suara_user:
                         if proses_jawaban(suara_user, ai, memori, skill_manager):
                             break

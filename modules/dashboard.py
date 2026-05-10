@@ -87,7 +87,7 @@ def _generate_html() -> str:
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta http-equiv="refresh" content="30">
+<meta http-equiv="refresh" content="15">
 <title>FRIDAY — JARVIS INTERFACE</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
@@ -297,6 +297,29 @@ body::after{{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 </div>
 
 <script>
+// Live status polling setiap 4 detik — update status bar tanpa full reload
+const STATUS_COLORS = {{
+  'Standby'     :'#00e5ff',
+  'Mendengarkan':'#00ff88',
+  'Memproses'   :'#ff9800',
+  'Berbicara'   :'#c850ff',
+  'Browsing'    :'#2196f3',
+  'Riset'       :'#ff9800',
+  'Vision'      :'#c850ff',
+}};
+function pollStatus(){{
+  fetch('/status').then(r=>r.json()).then(d=>{{
+    const dot=document.querySelector('.sdot');
+    const val=document.querySelector('.sval');
+    const btn=document.getElementById('stopBtn');
+    const col=STATUS_COLORS[d.status]||'#00e5ff';
+    if(dot){{dot.style.background=col;dot.style.boxShadow='0 0 10px '+col;}}
+    if(val)val.textContent=d.status.toUpperCase();
+    if(btn)btn.style.display=d.status==='Berbicara'?'flex':'none';
+  }}).catch(()=>{{}});
+}}
+setInterval(pollStatus,4000);
+
 // Barge-in: hentikan Friday
 function stopFriday(){{
   fetch('/stop').then(()=>{{
@@ -383,17 +406,22 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/stop":
-            # Barge-in: hentikan TTS yang sedang berjalan
             if _stop_callback:
                 try:
                     _stop_callback()
                 except Exception:
                     pass
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(b'{"ok":true}')
+            self._json(b'{"ok":true}')
+            return
+
+        if self.path == "/status":
+            import json
+            from datetime import datetime
+            payload = json.dumps({
+                "status" : _data.get("status", "Standby"),
+                "updated": datetime.now().strftime("%H:%M:%S"),
+            }).encode("utf-8")
+            self._json(payload)
             return
 
         html = _generate_html().encode("utf-8")
@@ -402,6 +430,14 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(html)))
         self.end_headers()
         self.wfile.write(html)
+
+    def _json(self, payload: bytes):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        self.wfile.write(payload)
 
     def log_message(self, *args):
         pass
