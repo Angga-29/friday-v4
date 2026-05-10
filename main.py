@@ -32,7 +32,7 @@ import config
 from modules.tampilan    import (
     tampilkan_header, tampilkan_status, tampilkan_divider,
     pop_up_berita, tampilkan_browsing, tampilkan_vision,
-    tampilkan_statistik
+    tampilkan_statistik, tampilkan_app_dibuka, tampilkan_musik
 )
 from modules.suara       import bicara
 from modules.pendengar   import dengarkan

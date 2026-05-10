@@ -1,66 +1,203 @@
 # ==============================================================
-# skills/musik.py — Skill Pemutar Musik
+# skills/musik.py — Friday | Kontrol Musik
+# v2.0 — Spotify + musik lokal + volume + next/prev
 # ==============================================================
 import glob
 import os
 import subprocess
 from typing import Optional
 
-NAMA = "Pemutar Musik"
-PRIORITAS = 20
+NAMA      = "Kontrol Musik"
+PRIORITAS = 8
+
 TRIGGER_WORDS = [
-    "putar musik", "play musik", "mainkan musik",
-    "matikan musik", "stop musik", "hentikan musik",
-    "pause musik", "lanjutkan musik",
+    # Putar
+    "putar musik", "play musik", "mainkan musik", "nyalakan musik",
+    "putar spotify", "buka spotify musik", "play spotify",
+    "putar lagu", "mainkan lagu",
+    # Stop
+    "hentikan musik", "stop musik", "matikan musik", "pause musik",
+    "berhenti musik",
+    # Next / Prev
+    "lagu berikutnya", "next lagu", "skip lagu", "ganti lagu",
+    "lagu sebelumnya", "previous lagu", "lagu tadi",
+    # Volume
+    "volume musik", "kencangkan", "keraskan", "kecilkan", "volume",
+    "naikkan volume", "turunkan volume", "volume naik", "volume turun",
+    # Spotify khusus
+    "spotify",
 ]
 
-_proses_musik = None
+_proses_mpv: Optional[subprocess.Popen] = None
 
 
-def _cari_file_musik() -> list:
+# ── Helpers ───────────────────────────────────────────────────
+
+def _tampil_musik(aksi: str, detail: str = ""):
+    try:
+        from modules.tampilan import tampilkan_musik
+        tampilkan_musik(aksi, detail)
+    except ImportError:
+        pass
+
+
+def _cari_file_lokal() -> list:
     direktori = [
         os.path.expanduser("~/Music"),
-        os.path.expanduser("~/music"),
         "/sdcard/Music",
         "/sdcard/musik",
         "/storage/emulated/0/Music",
-        "/storage/emulated/0/musik",
     ]
-    ekstensi = ("*.mp3", "*.m4a", "*.flac", "*.ogg", "*.aac", "*.wav")
     files = []
     for d in direktori:
         if os.path.isdir(d):
-            for ext in ekstensi:
+            for ext in ("*.mp3", "*.m4a", "*.flac", "*.ogg", "*.aac"):
                 files.extend(glob.glob(os.path.join(d, "**", ext), recursive=True))
     return files
 
 
+def _kirim_media_key(aksi: str) -> bool:
+    """Kirim tombol media ke Android (play/pause/next/prev)."""
+    kode = {
+        "play_pause": "85",
+        "next":       "87",
+        "previous":   "88",
+    }.get(aksi)
+    if not kode:
+        return False
+
+    # Metode 1: input keyevent
+    try:
+        ret = subprocess.run(
+            ["input", "keyevent", kode],
+            capture_output=True, timeout=3
+        )
+        if ret.returncode == 0:
+            return True
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    # Metode 2: am broadcast media button
+    try:
+        subprocess.run(
+            ["am", "broadcast", "-a",
+             "android.intent.action.MEDIA_BUTTON",
+             "--ei", "android.intent.extra.KEY_EVENT", kode],
+            capture_output=True, timeout=3
+        )
+        return True
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    return False
+
+
+def _atur_volume(arah: str) -> str:
+    """Naikkan atau turunkan volume media Android."""
+    kode = "24" if arah == "naik" else "25"   # KEYCODE_VOLUME_UP / DOWN
+    try:
+        for _ in range(3):   # tekan 3x agar terasa
+            subprocess.run(["input", "keyevent", kode],
+                           capture_output=True, timeout=2)
+        return f"Volume {'dinaikkan' if arah == 'naik' else 'diturunkan'}."
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return "Tidak bisa mengatur volume."
+
+
+def _buka_spotify() -> bool:
+    pkg = "com.spotify.music"
+    for cmd in [
+        ["am", "start", pkg],
+        ["monkey", "-p", pkg, "-c", "android.intent.category.LAUNCHER", "1"],
+    ]:
+        try:
+            ret = subprocess.run(cmd, capture_output=True, timeout=5)
+            if ret.returncode == 0:
+                return True
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            continue
+    return False
+
+
+# ── Skill entry point ─────────────────────────────────────────
+
 def jalankan(teks: str, **ctx) -> Optional[str]:
-    global _proses_musik
+    global _proses_mpv
     teks_lower = teks.lower()
 
-    if any(k in teks_lower for k in ["matikan", "stop", "pause", "hentikan"]):
-        if _proses_musik and _proses_musik.poll() is None:
-            _proses_musik.terminate()
-            _proses_musik = None
-            return "Musik dihentikan."
-        return "Tidak ada musik yang sedang diputar."
+    # ── VOLUME ────────────────────────────────────────────────
+    if any(k in teks_lower for k in
+           ["kencangkan", "keraskan", "naikkan volume", "volume naik", "volume keras"]):
+        _tampil_musik("Volume", "naik ▲▲▲")
+        return _atur_volume("naik")
 
-    files = _cari_file_musik()
+    if any(k in teks_lower for k in
+           ["kecilkan", "turunkan volume", "volume turun", "volume kecil"]):
+        _tampil_musik("Volume", "turun ▼▼▼")
+        return _atur_volume("turun")
+
+    # ── NEXT / PREV ───────────────────────────────────────────
+    if any(k in teks_lower for k in
+           ["berikutnya", "next", "skip", "ganti lagu"]):
+        _tampil_musik("▶▶ Next Track")
+        if _proses_mpv and _proses_mpv.poll() is None:
+            # mpv: kirim 'q' lalu maju ke lagu berikut via playlist
+            _proses_mpv.stdin and None   # mpv tidak pakai stdin di mode ini
+        _kirim_media_key("next")
+        return "Lagu selanjutnya."
+
+    if any(k in teks_lower for k in
+           ["sebelumnya", "previous", "lagu tadi"]):
+        _tampil_musik("◀◀ Previous Track")
+        _kirim_media_key("previous")
+        return "Kembali ke lagu sebelumnya."
+
+    # ── STOP / PAUSE ──────────────────────────────────────────
+    if any(k in teks_lower for k in
+           ["hentikan", "stop", "matikan musik", "pause", "berhenti"]):
+        dihentikan = False
+        if _proses_mpv and _proses_mpv.poll() is None:
+            _proses_mpv.terminate()
+            _proses_mpv = None
+            dihentikan = True
+        _kirim_media_key("play_pause")   # pause Spotify jika sedang main
+        _tampil_musik("⏹ Stop Musik")
+        return "Musik dihentikan." if dihentikan else "Musik dijeda."
+
+    # ── SPOTIFY ───────────────────────────────────────────────
+    if "spotify" in teks_lower:
+        _tampil_musik("▶ Membuka Spotify")
+        if _buka_spotify():
+            # Kirim play setelah jeda singkat
+            import time; time.sleep(1.5)
+            _kirim_media_key("play_pause")
+            return "Spotify dibuka dan diputar, Bos."
+        return "Tidak bisa membuka Spotify. Pastikan aplikasinya terinstall."
+
+    # ── MUSIK LOKAL (mpv) ─────────────────────────────────────
+    files = _cari_file_lokal()
     if not files:
-        return ("Tidak ada file musik ditemukan. "
-                "Pastikan ada lagu di folder Music penyimpanan Anda.")
+        # Tidak ada lokal → coba buka Spotify
+        _tampil_musik("▶ Spotify (tidak ada musik lokal)")
+        if _buka_spotify():
+            import time; time.sleep(1.5)
+            _kirim_media_key("play_pause")
+            return ("Tidak ada musik lokal ditemukan. "
+                    "Membuka Spotify sebagai gantinya.")
+        return ("Tidak ada file musik lokal. "
+                "Install Spotify atau tambahkan lagu ke folder Music.")
 
-    if _proses_musik and _proses_musik.poll() is None:
-        _proses_musik.terminate()
+    if _proses_mpv and _proses_mpv.poll() is None:
+        _proses_mpv.terminate()
 
     try:
-        _proses_musik = subprocess.Popen(
-            ["mpv", "--no-video", "--shuffle", "--quiet",
-             "--loop-playlist=inf"] + files[:100],
+        _proses_mpv = subprocess.Popen(
+            ["mpv", "--no-video", "--shuffle",
+             "--quiet", "--loop-playlist=inf"] + files[:200],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        return f"Memutar {len(files)} lagu secara acak. Nikmati musiknya!"
+        _tampil_musik("▶ Memutar Musik Lokal", f"{len(files)} lagu (acak)")
+        return f"Memutar {len(files)} lagu lokal secara acak. Nikmati, Bos!"
     except FileNotFoundError:
-        return "mpv tidak terinstal. Jalankan di Termux: pkg install mpv"
+        return "mpv tidak terinstall. Jalankan: pkg install mpv"
