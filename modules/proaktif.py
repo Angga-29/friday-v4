@@ -81,7 +81,13 @@ class ModeProaktif:
             try:
                 berita = self.callback_berita()
                 if berita:
-                    bagian.append(f"Berita hari ini: {berita[0]}")
+                    item = berita[0]
+                    if isinstance(item, dict):
+                        judul = item.get("judul", "")
+                    else:
+                        judul = str(item)
+                    if judul:
+                        bagian.append(f"Berita hari ini: {judul}")
             except Exception:
                 pass
 

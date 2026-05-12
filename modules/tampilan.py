@@ -168,7 +168,14 @@ def pop_up_berita(daftar_berita: list):
     print()
     print(Y + "  ╔══ " + W + "📡 BERITA TERKINI" + Y + " " + "═" * 33 + "╗")
     for i, berita in enumerate(daftar_berita, 1):
-        pendek  = (berita[:50] + "..") if len(berita) > 52 else berita
+        # Format baru: dict {judul, sumber, ...} | Lama: string
+        if isinstance(berita, dict):
+            sumber = berita.get("sumber", "")
+            judul  = berita.get("judul", "")
+            teks   = f"{sumber}: {judul}" if sumber else judul
+        else:
+            teks = str(berita)
+        pendek  = (teks[:50] + "..") if len(teks) > 52 else teks
         padding = " " * (52 - len(pendek))
         print(Y + "  ║ " + W + f"{i}. {pendek}" + padding + Y + " ║")
     print(Y + "  ╚" + "═" * 54 + "╝")

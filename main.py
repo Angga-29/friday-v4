@@ -301,7 +301,9 @@ def proses_jawaban(suara_user, ai, memori, skill_manager):
 
         # ── 5. SKILLS (lokal — lebih cepat dari Gemini) ──────────────
         hasil_skill = skill_manager.cari_dan_jalankan(
-            suara_user, callback_bicara=bicara,
+            suara_user,
+            callback_bicara=bicara,
+            berita=cache_berita,
         )
         if hasil_skill is not None:
             tampilkan_status("Dijawab oleh skill lokal.", "sukses")

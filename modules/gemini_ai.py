@@ -246,7 +246,19 @@ class GeminiAI:
         tampilkan_status("Sesi percakapan direset.", "info")
 
     def bangun_konteks(self, suara_user, waktu, cuaca, berita):
-        berita_str = " | ".join(berita) if berita else "tidak tersedia"
+        # berita bisa list[dict] (format baru) atau list[str] (lama)
+        if berita:
+            judul_list = []
+            for b in berita:
+                if isinstance(b, dict):
+                    sumber = b.get("sumber", "").strip()
+                    judul = b.get("judul", "").strip()
+                    judul_list.append(f"{sumber}: {judul}" if sumber else judul)
+                else:
+                    judul_list.append(str(b))
+            berita_str = " | ".join(judul_list)
+        else:
+            berita_str = "tidak tersedia"
         return (
             f"[KONTEKS REAL-TIME]\n"
             f"Waktu  : {waktu}\n"

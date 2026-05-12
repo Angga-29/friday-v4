@@ -9,34 +9,51 @@ PRIORITAS = 5   # Tinggi — dicek sebelum skill lain
 
 TRIGGER_WORDS = [
     "buka", "jalankan", "nyalakan", "aktifkan", "launch",
-    "buka spotify", "buka youtube", "buka whatsapp",
-    "buka instagram", "buka tiktok", "buka telegram",
-    "buka chrome", "buka kamera", "buka galeri",
-    "buka kalkulator", "buka pengaturan", "buka maps",
-    "buka netflix", "buka capcut", "buka gojek", "buka tokopedia",
 ]
 
 # Peta nama app → package Android
 # alias: kata-kata yang dikenali dari suara user
 APP_MAP = [
-    ("spotify",     "com.spotify.music",              ["spotify", "spotipai"]),
-    ("youtube",     "com.google.android.youtube",     ["youtube", "you tube", "yt"]),
-    ("whatsapp",    "com.whatsapp",                   ["whatsapp", "wa", "watsap"]),
-    ("instagram",   "com.instagram.android",          ["instagram", "ig", "insta"]),
-    ("tiktok",      "com.zhiliaoapp.musically",       ["tiktok", "tik tok"]),
-    ("telegram",    "org.telegram.messenger",         ["telegram"]),
-    ("chrome",      "com.android.chrome",             ["chrome", "browser", "google chrome"]),
-    ("maps",        "com.google.android.apps.maps",   ["maps", "google maps", "peta", "navigasi"]),
-    ("kamera",      "com.android.camera2",            ["kamera", "camera", "kamer"]),
-    ("galeri",      "com.google.android.apps.photos", ["galeri", "gallery", "foto", "gambar"]),
-    ("kalkulator",  "com.android.calculator2",        ["kalkulator", "calculator"]),
-    ("pengaturan",  "com.android.settings",           ["pengaturan", "settings", "setelan"]),
-    ("netflix",     "com.netflix.mediaclient",        ["netflix"]),
-    ("capcut",      "com.lemon.lvoverseas",           ["capcut", "cap cut"]),
-    ("gojek",       "com.gojek.app",                  ["gojek"]),
-    ("tokopedia",   "com.tokopedia.tkpd",             ["tokopedia"]),
-    ("shopee",      "com.shopee.id",                  ["shopee"]),
-    ("grab",        "com.grabtaxi.passenger",         ["grab"]),
+    # ── Sosial & Pesan ──
+    ("spotify",         "com.spotify.music",              ["spotify", "spotipai"]),
+    ("youtube",         "com.google.android.youtube",     ["youtube", "you tube", "yt"]),
+    ("youtube music",   "com.google.android.apps.youtube.music", ["youtube music", "yt music"]),
+    ("whatsapp",        "com.whatsapp",                   ["whatsapp", "wa", "watsap"]),
+    ("instagram",       "com.instagram.android",          ["instagram", "ig", "insta"]),
+    ("tiktok",          "com.zhiliaoapp.musically",       ["tiktok", "tik tok"]),
+    ("telegram",        "org.telegram.messenger",         ["telegram"]),
+    ("line",            "jp.naver.line.android",          ["line"]),
+    ("twitter",         "com.twitter.android",            ["twitter", "x", "twiter"]),
+    ("facebook",        "com.facebook.katana",            ["facebook", "fb"]),
+    ("discord",         "com.discord",                    ["discord"]),
+    ("zoom",            "us.zoom.videomeetings",          ["zoom", "zum"]),
+    ("gmail",           "com.google.android.gm",          ["gmail", "email", "mail"]),
+
+    # ── E-Wallet & Banking ──
+    ("dana",            "id.dana",                        ["dana"]),
+    ("ovo",             "ovo.id",                         ["ovo"]),
+    ("gopay",           "com.gojek.app",                  ["gopay", "go pay"]),
+    ("bca mobile",      "com.bca",                        ["bca", "bca mobile", "mybca"]),
+    ("brimo",           "id.co.bri.brimo",                ["brimo", "bri", "bri mobile"]),
+    ("mandiri online",  "com.bankmandiri.mandirionline",  ["mandiri", "mandiri online", "livin"]),
+
+    # ── Browser & Sistem ──
+    ("chrome",          "com.android.chrome",             ["chrome", "browser", "google chrome"]),
+    ("play store",      "com.android.vending",            ["play store", "playstore", "google play"]),
+    ("maps",            "com.google.android.apps.maps",   ["maps", "google maps", "peta", "navigasi"]),
+    ("kamera",          "com.android.camera2",            ["kamera", "camera", "kamer"]),
+    ("galeri",          "com.google.android.apps.photos", ["galeri", "gallery", "foto", "gambar"]),
+    ("kalkulator",      "com.android.calculator2",        ["kalkulator", "calculator"]),
+    ("pengaturan",      "com.android.settings",           ["pengaturan", "settings", "setelan"]),
+    ("jam",             "com.android.deskclock",          ["jam", "clock", "alarm"]),
+
+    # ── Hiburan & Belanja ──
+    ("netflix",         "com.netflix.mediaclient",        ["netflix"]),
+    ("capcut",          "com.lemon.lvoverseas",           ["capcut", "cap cut"]),
+    ("gojek",           "com.gojek.app",                  ["gojek", "go jek"]),
+    ("grab",            "com.grabtaxi.passenger",         ["grab"]),
+    ("tokopedia",       "com.tokopedia.tkpd",             ["tokopedia", "toped"]),
+    ("shopee",          "com.shopee.id",                  ["shopee"]),
 ]
 
 

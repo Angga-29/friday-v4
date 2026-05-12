@@ -11,6 +11,7 @@ Cara kerja:
 """
 
 import os
+import html as _html_lib
 import threading
 import subprocess
 from datetime import datetime
@@ -60,25 +61,54 @@ def _generate_html() -> str:
     c_ikon  = cd.get("ikon", "🌡️")
     c_kota  = cd.get("nama", "")
 
+    def _esc(s):
+        return _html_lib.escape(str(s or ""), quote=True)
+
     berita_items = ""
     for i, b in enumerate(berita[:6], 1):
-        judul = (b[:90] + "…") if len(b) > 90 else b
+        # Backwards compatible: terima dict ATAU string
+        if isinstance(b, dict):
+            judul    = b.get("judul", "")
+            sumber   = b.get("sumber", "")
+            waktu_b  = b.get("waktu", "")
+            ringkas  = b.get("ringkasan", "")
+            url_b    = b.get("url", "")
+        else:
+            judul, sumber, waktu_b, ringkas, url_b = str(b), "", "", "", ""
+
         # Tentukan warna berdasarkan sumber
-        if "🇮🇩" in b:
+        gabung_chk = f"{sumber} {judul}"
+        if "🇮🇩" in gabung_chk:
             dot_color = "#00ff88"   # hijau = Indonesia
-        elif any(f in b for f in ("🌍","🇺🇸","🇬🇧","🇶🇦","💻")):
+        elif any(f in gabung_chk for f in ("🌍","🇺🇸","🇬🇧","🇶🇦","💻")):
             dot_color = "#00e5ff"   # cyan = internasional
         else:
             dot_color = "#ff9800"   # orange = newsapi / lainnya
+
         nomor = f"0{i}" if i < 10 else str(i)
+        link_html = (
+            f'<a class="n-link" href="{_esc(url_b)}" target="_blank" '
+            f'rel="noopener noreferrer">Buka →</a>'
+            if url_b else
+            '<span class="n-link" style="opacity:0.3;cursor:default;">— offline</span>'
+        )
         berita_items += (
-            f'<div class="news-row">'
-            f'<span class="n-idx" style="color:{dot_color};">{nomor}</span>'
-            f'<span class="n-txt">{judul}</span>'
+            f'<div class="news-card">'
+            f'  <div class="news-head">'
+            f'    <span class="n-idx" style="color:{dot_color};">{nomor}</span>'
+            f'    <span class="n-src" style="color:{dot_color};">{_esc(sumber)}</span>'
+            f'    <span class="n-time">{_esc(waktu_b)}</span>'
+            f'  </div>'
+            f'  <div class="n-title">{_esc(judul)}</div>'
+            f'  <div class="n-summary">{_esc(ringkas)}</div>'
+            f'  <div class="n-foot">{link_html}</div>'
             f'</div>'
         )
     if not berita_items:
-        berita_items = '<div class="news-row"><span class="n-idx">--</span><span class="n-txt">Menghubungi server berita...</span></div>'
+        berita_items = (
+            '<div class="news-card"><div class="n-title" style="color:rgba(0,229,255,0.5);">'
+            'Menghubungi server berita...</div></div>'
+        )
 
     status_color = {"Standby":"#00e5ff","Mendengarkan":"#00ff88","Memproses":"#ff9800","Berbicara":"#c850ff"}.get(status,"#00e5ff")
 
@@ -169,10 +199,17 @@ body::after{{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 /* ── News ── */
 .news-wrap{{background:rgba(0,8,16,0.85);border:1px solid rgba(0,229,255,0.2);padding:12px;margin-bottom:10px;position:relative;overflow:hidden;}}
 .news-wrap::before{{content:'';position:absolute;top:0;left:0;width:2px;height:100%;background:linear-gradient(180deg,#ff9800,transparent);}}
-.news-row{{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid rgba(0,229,255,0.06);font-size:11px;color:rgba(255,255,255,0.8);align-items:flex-start;}}
-.news-row:last-child{{border:none;}}
-.n-idx{{color:#ff9800;font-weight:bold;min-width:18px;font-size:10px;margin-top:1px;}}
-.n-txt{{line-height:1.4;}}
+.news-card{{background:rgba(0,12,24,0.55);border:1px solid rgba(0,229,255,0.08);border-left:2px solid rgba(0,229,255,0.25);padding:8px 10px;margin:7px 0;transition:all .2s;}}
+.news-card:hover{{background:rgba(0,18,32,0.75);border-left-color:#00e5ff;}}
+.news-head{{display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:9px;letter-spacing:1px;}}
+.n-idx{{font-weight:bold;font-family:'Orbitron',monospace;}}
+.n-src{{font-weight:bold;text-transform:uppercase;font-size:9px;}}
+.n-time{{margin-left:auto;color:rgba(0,229,255,0.4);font-size:9px;font-style:italic;}}
+.n-title{{font-size:12px;color:#fff;font-weight:600;line-height:1.35;margin-bottom:4px;}}
+.n-summary{{font-size:10px;color:rgba(255,255,255,0.55);line-height:1.4;margin-bottom:5px;}}
+.n-foot{{text-align:right;}}
+.n-link{{display:inline-block;font-size:9px;color:#00e5ff;text-decoration:none;letter-spacing:2px;padding:2px 8px;border:1px solid rgba(0,229,255,0.35);border-radius:2px;transition:all .2s;font-weight:bold;}}
+.n-link:hover{{background:rgba(0,229,255,0.15);box-shadow:0 0 10px rgba(0,229,255,0.4);color:#fff;}}
 
 /* ── Ticker ── */
 .ticker-wrap{{overflow:hidden;background:rgba(0,229,255,0.04);border-top:1px solid rgba(0,229,255,0.15);border-bottom:1px solid rgba(0,229,255,0.15);padding:5px 0;margin-bottom:10px;}}

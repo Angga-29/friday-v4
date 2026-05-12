@@ -3,9 +3,12 @@
 # Versi : 3.0.0 — Triple fallback: OWM → wttr.in (cuaca) | NewsAPI → RSS (berita)
 # ==============================================================
 
+import re
+import html
 import requests
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from modules.tampilan import tampilkan_status
 
 TIMEOUT_API = 8   # detik
@@ -161,6 +164,7 @@ def dapatkan_cuaca(api_key: str, kota: str) -> str:
 
 # ==============================================================
 # BERITA — Fallback: NewsAPI → RSS campuran Indonesia + Internasional
+# Format baru: list[dict] dengan keys: judul, sumber, waktu, ringkasan, url
 # ==============================================================
 
 # Feed Indonesia
@@ -182,9 +186,43 @@ _FEEDS_INTL = [
     ("💻 TechCrunch","https://techcrunch.com/feed/"),
 ]
 
+_RE_HTML = re.compile(r"<[^>]+>")
+_RE_WS   = re.compile(r"\s+")
+
+
+def _strip_html(teks: str) -> str:
+    """Hapus tag HTML, decode entitas, normalkan whitespace."""
+    if not teks:
+        return ""
+    teks = _RE_HTML.sub("", teks)
+    teks = html.unescape(teks)
+    teks = _RE_WS.sub(" ", teks).strip()
+    return teks
+
+
+def _waktu_relatif(pub_str: str) -> str:
+    """Konversi pubDate RSS ke string relatif: '5 menit lalu', '2 jam lalu'."""
+    if not pub_str:
+        return "baru saja"
+    try:
+        dt = parsedate_to_datetime(pub_str.strip())
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        delta = datetime.now(timezone.utc) - dt
+        detik = int(delta.total_seconds())
+        if detik < 60:
+            return "baru saja"
+        if detik < 3600:
+            return f"{detik // 60} menit lalu"
+        if detik < 86400:
+            return f"{detik // 3600} jam lalu"
+        return f"{detik // 86400} hari lalu"
+    except Exception:
+        return "baru saja"
+
 
 def _ambil_rss(feeds: list, maks: int) -> list:
-    """Ambil judul dari daftar RSS feed, beri label sumber."""
+    """Ambil item dari daftar RSS feed sebagai list[dict]."""
     hasil = []
     for label, url in feeds:
         if len(hasil) >= maks:
@@ -196,10 +234,22 @@ def _ambil_rss(feeds: list, maks: int) -> list:
             root = ET.fromstring(r.content)
             per_feed = 0
             for item in root.findall(".//item"):
-                title = (item.findtext("title") or "").strip()
-                if title and len(title) > 10 and "<" not in title:
-                    hasil.append(f"{label}: {title}")
-                    per_feed += 1
+                title = _strip_html(item.findtext("title") or "")
+                if not title or len(title) < 10:
+                    continue
+                link = (item.findtext("link") or "").strip()
+                desc = _strip_html(item.findtext("description") or "")
+                if len(desc) > 140:
+                    desc = desc[:137] + "..."
+                pub_raw = item.findtext("pubDate") or ""
+                hasil.append({
+                    "judul"   : title,
+                    "sumber"  : label,
+                    "waktu"   : _waktu_relatif(pub_raw),
+                    "ringkasan": desc or "Klik untuk membaca selengkapnya.",
+                    "url"     : link or "",
+                })
+                per_feed += 1
                 if per_feed >= 2 or len(hasil) >= maks:   # maks 2 per feed
                     break
             tampilkan_status(f"Berita {label} OK ({per_feed} item).", "sukses")
@@ -210,7 +260,7 @@ def _ambil_rss(feeds: list, maks: int) -> list:
 
 
 def _berita_newsapi(api_key: str, jumlah: int) -> list | None:
-    """Ambil berita dari NewsAPI. Return list atau None jika gagal."""
+    """Ambil berita dari NewsAPI. Return list[dict] atau None jika gagal."""
     if not api_key or "your_" in api_key:
         return None
     try:
@@ -226,11 +276,22 @@ def _berita_newsapi(api_key: str, jumlah: int) -> list | None:
         d = r.json()
         if d.get("status") != "ok":
             return None
-        hasil = [
-            a["title"]
-            for a in d.get("articles", [])[:jumlah]
-            if a.get("title") and a["title"] != "[Removed]"
-        ]
+        hasil = []
+        for a in d.get("articles", [])[:jumlah]:
+            judul = a.get("title", "")
+            if not judul or judul == "[Removed]":
+                continue
+            sumber = a.get("source", {}).get("name", "📰 NewsAPI")
+            desc = _strip_html(a.get("description") or "")
+            if len(desc) > 140:
+                desc = desc[:137] + "..."
+            hasil.append({
+                "judul"   : judul,
+                "sumber"  : f"📰 {sumber}",
+                "waktu"   : _waktu_relatif(a.get("publishedAt", "")),
+                "ringkasan": desc or "Klik untuk membaca selengkapnya.",
+                "url"     : a.get("url", ""),
+            })
         return hasil or None
     except Exception as e:
         tampilkan_status(f"NewsAPI gagal: {e}", "peringatan")
@@ -239,7 +300,8 @@ def _berita_newsapi(api_key: str, jumlah: int) -> list | None:
 
 def dapatkan_berita(api_key: str, jumlah: int = 6) -> list:
     """
-    Return list judul berita campuran Indonesia + internasional.
+    Return list[dict] berita campuran Indonesia + internasional.
+    Setiap item: {judul, sumber, waktu, ringkasan, url}.
     Fallback: NewsAPI → RSS otomatis.
     """
     hasil = _berita_newsapi(api_key, jumlah)
@@ -263,4 +325,25 @@ def dapatkan_berita(api_key: str, jumlah: int = 6) -> list:
         if i_id >= len(id_items) and i_intl >= len(intl_items):
             break
 
-    return gabung[:jumlah] if gabung else ["Berita tidak tersedia saat ini."]
+    if gabung:
+        return gabung[:jumlah]
+    return [{
+        "judul"   : "Berita tidak tersedia saat ini.",
+        "sumber"  : "❓ Sistem",
+        "waktu"   : "",
+        "ringkasan": "Koneksi internet bermasalah atau semua feed berita gagal dimuat.",
+        "url"     : "",
+    }]
+
+
+def berita_ke_teks(berita: list) -> list:
+    """Helper: ekstrak judul saja dari list[dict] berita untuk Gemini/TTS."""
+    hasil = []
+    for b in berita:
+        if isinstance(b, dict):
+            sumber = b.get("sumber", "")
+            judul = b.get("judul", "")
+            hasil.append(f"{sumber}: {judul}" if sumber else judul)
+        else:
+            hasil.append(str(b))
+    return hasil
