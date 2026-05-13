@@ -1,27 +1,51 @@
 # ==============================================================
 # modules/tampilan.py — Project Friday | JARVIS-Style Display
-# Versi : 5.0.0 — Redesign penuh: banner, panel, speech bubble
+# Versi : 6.0.0 — Animated spinner, proper word-wrap, richer UI
 # ==============================================================
 
 import os
+import sys
+import time
+import threading
 from colorama import Fore, Back, Style, init
 from datetime import datetime
 
 init(autoreset=True)
 
-VERSION   = "4.0.0"
-LEBAR     = 56   # lebar konten dalam box
+VERSION = "4.0.0"
+LEBAR   = 58   # lebar konten dalam box
 
 # ── Warna tema ────────────────────────────────────────────────
-C  = Fore.CYAN    + Style.BRIGHT   # Cyan terang  — frame utama
-W  = Fore.WHITE   + Style.BRIGHT   # Putih terang — teks
-G  = Fore.GREEN   + Style.BRIGHT   # Hijau        — sukses / user
-Y  = Fore.YELLOW  + Style.BRIGHT   # Kuning       — peringatan
-R  = Fore.RED     + Style.BRIGHT   # Merah        — error
-M  = Fore.MAGENTA + Style.BRIGHT   # Magenta      — AI / vision
-B  = Fore.BLUE    + Style.BRIGHT   # Biru         — browsing
+C   = Fore.CYAN    + Style.BRIGHT
+W   = Fore.WHITE   + Style.BRIGHT
+G   = Fore.GREEN   + Style.BRIGHT
+Y   = Fore.YELLOW  + Style.BRIGHT
+R   = Fore.RED     + Style.BRIGHT
+M   = Fore.MAGENTA + Style.BRIGHT
+B   = Fore.BLUE    + Style.BRIGHT
 DIM = Style.DIM
 RST = Style.RESET_ALL
+
+
+# ==============================================================
+# WORD-WRAP HELPER
+# ==============================================================
+def _wrap_teks(teks: str, lebar: int) -> list:
+    """Pecah teks menjadi list baris dengan panjang maks lebar karakter.
+    Tidak memotong kata di tengah."""
+    kata_list = teks.split()
+    baris_list = []
+    baris = ""
+    for kata in kata_list:
+        if len(baris) + len(kata) + (1 if baris else 0) <= lebar:
+            baris = (baris + " " + kata) if baris else kata
+        else:
+            if baris:
+                baris_list.append(baris)
+            baris = kata
+    if baris:
+        baris_list.append(baris)
+    return baris_list or [""]
 
 
 def bersihkan_layar():
@@ -33,42 +57,53 @@ def bersihkan_layar():
 # ==============================================================
 def tampilkan_header():
     bersihkan_layar()
-    sekarang = datetime.now().strftime("%d %B %Y  |  %H:%M:%S")
+    sekarang = datetime.now().strftime("%A, %d %B %Y  ·  %H:%M:%S")
 
     garis = "═" * LEBAR
+    print()
     print(C + "╔" + garis + "╗")
+    print(C + "║" + " " * LEBAR + "║")
     print(C + "║" + W +
-          "   ███████╗██████╗ ██╗██████╗  █████╗ ██╗   ██╗  " + C + "║")
+          "    ███████╗██████╗ ██╗██████╗  █████╗ ██╗   ██╗   " + C + "║")
     print(C + "║" + C +
-          "   ██╔════╝██╔══██╗██║██╔══██╗██╔══██╗╚██╗ ██╔╝  " + C + "║")
+          "    ██╔════╝██╔══██╗██║██╔══██╗██╔══██╗╚██╗ ██╔╝   " + C + "║")
     print(C + "║" + W +
-          "   █████╗  ██████╔╝██║██║  ██║███████║ ╚████╔╝   " + C + "║")
+          "    █████╗  ██████╔╝██║██║  ██║███████║ ╚████╔╝    " + C + "║")
     print(C + "║" + C +
-          "   ██╔══╝  ██╔══██╗██║██║  ██║██╔══██║  ╚██╔╝    " + C + "║")
+          "    ██╔══╝  ██╔══██╗██║██║  ██║██╔══██║  ╚██╔╝     " + C + "║")
     print(C + "║" + W +
-          "   ██║     ██║  ██║██║██████╔╝██║  ██║   ██║      " + C + "║")
-    print(C + "╠" + garis + "╣")
-    print(C + "║  " + G + f"AI Personal Assistant  •  v{VERSION}  PREMIUM" +
-          " " * (LEBAR - 43) + C + "║")
-    print(C + "║  " + Y + f"{sekarang:<54}" + C + "║")
-    print(C + "╠" + garis + "╣")
+          "    ██║     ██║  ██║██║██████╔╝██║  ██║   ██║       " + C + "║")
+    print(C + "║" + " " * LEBAR + "║")
+    print(C + "╠" + "═" * LEBAR + "╣")
+
+    sub = " JARVIS INTERFACE  ·  ANGGA PROJECT  ·  v4.0 PREMIUM "
+    pad = LEBAR - len(sub)
+    print(C + "║" + Fore.CYAN + DIM + sub + " " * pad + C + "║")
+    print(C + "╠" + "═" * LEBAR + "╣")
+
+    waktu_pad = LEBAR - len(sekarang) - 4
+    print(C + "║  " + Y + sekarang + " " * waktu_pad + C + "  ║")
+    print(C + "╠" + "─" * LEBAR + "╣")
 
     fitur = [
-        ("⬡", "Kamera & Vision",  "ONLINE", G),
-        ("⬡", "Gemini AI 2.5",   "ONLINE", G),
-        ("⬡", "Wake Word",       "AKTIF",  G),
-        ("⬡", "Pengenalan Wajah","AKTIF",  G),
-        ("⬡", "Browsing Internet","AKTIF", G),
-        ("⬡", "Mode Proaktif",   "AKTIF",  G),
-        ("⬡", "Memori Permanen", "AKTIF",  G),
-        ("⬡", "Edge-TTS Premium","AKTIF",  G),
+        ("●", "Gemini 2.5 Flash",     "ONLINE", G),
+        ("●", "Edge-TTS  (en-GB-Ryan)", "AKTIF", G),
+        ("●", "Wake Word + Clap",      "AKTIF",  G),
+        ("●", "Skills System",         "LOADED", G),
+        ("●", "Browser + Berita",      "AKTIF",  G),
+        ("●", "Memori Permanen",       "AKTIF",  G),
+        ("●", "Riset Mendalam",        "AKTIF",  G),
+        ("●", "Mode Proaktif",         "AKTIF",  G),
     ]
-    for ikon, nama, status, warna in fitur:
-        baris = f"  {ikon} {nama:<20}  {status}"
-        sisa  = LEBAR - len(baris) - 1
-        print(C + "║" + warna + baris + " " * sisa + C + "║")
+    mid = len(fitur) // 2
+    for i in range(mid):
+        a_ikon, a_nama, a_status, a_warna = fitur[i]
+        b_ikon, b_nama, b_status, b_warna = fitur[i + mid]
+        kol_a = f"  {a_ikon} {a_nama:<22} {a_warna}{a_status}{C}"
+        kol_b = f"  {b_ikon} {b_nama:<22} {b_warna}{b_status}{C}"
+        print(C + "║" + kol_a + " │" + kol_b + " " * 3 + "║")
 
-    print(C + "╚" + garis + "╝")
+    print(C + "╚" + "═" * LEBAR + "╝")
     print()
 
 
@@ -78,7 +113,7 @@ def tampilkan_header():
 _STATUS_CFG = {
     "info":      (Fore.CYAN,    "·", False),
     "sukses":    (Fore.GREEN,   "✓", True),
-    "peringatan":(Fore.YELLOW,  "!", True),
+    "peringatan":(Fore.YELLOW,  "⚠", True),
     "error":     (Fore.RED,     "✗", True),
     "ai":        (Fore.MAGENTA, "◈", True),
     "deteksi":   (Fore.YELLOW,  "⚡", True),
@@ -89,39 +124,89 @@ _STATUS_CFG = {
 }
 
 def tampilkan_status(pesan: str, tipe: str = "info"):
-    waktu           = datetime.now().strftime("%H:%M:%S")
+    waktu            = datetime.now().strftime("%H:%M:%S")
     warna, ikon, bold = _STATUS_CFG.get(tipe, (Fore.WHITE, "?", False))
-    tebal           = Style.BRIGHT if bold else ""
+    tebal            = Style.BRIGHT if bold else ""
     for i, baris in enumerate(pesan.splitlines()):
         if i == 0:
-            print(f"{Fore.CYAN}[{waktu}]{RST} {warna}{tebal}[{ikon}] {baris}{RST}")
+            print(f"{Fore.CYAN}{DIM}[{waktu}]{RST} {warna}{tebal}[{ikon}] {baris}{RST}")
         else:
             print(f"          {warna}    {baris}{RST}")
 
 
 # ==============================================================
-# SPEECH BUBBLE FRIDAY
+# ANIMATED SPINNER — untuk proses yang makan waktu
+# ==============================================================
+_spinner_aktif  = False
+_spinner_thread = None
+
+_SPINNER_FRAMES = ["⠋","⠙","⠸","⠴","⠦","⠇"]   # braille spinner
+
+def mulai_spinner(pesan: str = "Memproses"):
+    """Jalankan spinner animasi di background thread."""
+    global _spinner_aktif, _spinner_thread
+    if _spinner_aktif:
+        return
+    _spinner_aktif = True
+
+    def _loop():
+        idx = 0
+        while _spinner_aktif:
+            frame  = _SPINNER_FRAMES[idx % len(_SPINNER_FRAMES)]
+            waktu  = datetime.now().strftime("%H:%M:%S")
+            sys.stdout.write(
+                f"\r{Fore.CYAN}{DIM}[{waktu}]{RST} "
+                f"{M}{Style.BRIGHT}[{frame}] {pesan}...{RST}"
+            )
+            sys.stdout.flush()
+            idx += 1
+            time.sleep(0.12)
+        sys.stdout.write("\r" + " " * 72 + "\r")
+        sys.stdout.flush()
+
+    _spinner_thread = threading.Thread(target=_loop, daemon=True)
+    _spinner_thread.start()
+
+def stop_spinner():
+    global _spinner_aktif
+    _spinner_aktif = False
+    if _spinner_thread:
+        _spinner_thread.join(timeout=0.5)
+
+
+# ==============================================================
+# MEMPROSES — Gemini (dengan spinner)
+# ==============================================================
+def tampilkan_memproses():
+    mulai_spinner("Berpikir via Gemini 2.5")
+
+
+# ==============================================================
+# SPEECH BUBBLE FRIDAY — word-wrap proper
 # ==============================================================
 def tampilkan_friday_bicara(teks: str):
+    stop_spinner()   # hentikan spinner kalau masih jalan
     print()
-    lebar_bubble = LEBAR - 4
-    print(C + "  ╔══ " + W + "FRIDAY" + C + " " + "═" * (lebar_bubble - 7) + "╗")
-    # Pecah teks per kalimat
-    kalimat_list = []
-    for bagian in teks.replace('. ', '.|').replace('! ', '!|').replace('? ', '?|').split('|'):
-        bagian = bagian.strip()
-        if not bagian:
+    lebar_isi = LEBAR - 4   # ruang teks dalam box
+
+    # Pecah per kalimat dulu, lalu word-wrap tiap kalimat
+    semua_baris = []
+    for kalimat in teks.replace('. ', '.||').replace('! ', '!||').replace('? ', '?||').split('||'):
+        kalimat = kalimat.strip()
+        if not kalimat:
             continue
-        # Wrap panjang > lebar_bubble
-        while len(bagian) > lebar_bubble:
-            kalimat_list.append(bagian[:lebar_bubble])
-            bagian = bagian[lebar_bubble:]
-        if bagian:
-            kalimat_list.append(bagian)
-    for k in kalimat_list:
-        padding = lebar_bubble - len(k)
-        print(C + "  ║  " + W + k + " " * padding + C + "  ║")
-    print(C + "  ╚" + "═" * (lebar_bubble + 2) + "╝")
+        semua_baris.extend(_wrap_teks(kalimat, lebar_isi))
+
+    # Judul bubble
+    judul   = "◈ FRIDAY"
+    garis_t = "─" * (LEBAR - len(judul) - 4)
+    print(C + "  ╭─ " + W + judul + C + " " + garis_t + "╮")
+
+    for baris in semua_baris:
+        pad = lebar_isi - len(baris)
+        print(C + "  │  " + W + baris + " " * pad + C + "  │")
+
+    print(C + "  ╰" + "─" * (LEBAR) + "╯")
     print()
 
 
@@ -130,7 +215,12 @@ def tampilkan_friday_bicara(teks: str):
 # ==============================================================
 def tampilkan_user_bicara(teks: str):
     print()
-    print(G + "  ▶  ANDA : " + RST + W + teks)
+    baris_list = _wrap_teks(teks, LEBAR - 12)
+    print(G + "  ╭─ " + W + "▶ ANDA" + G + " " + "─" * (LEBAR - 7) + "╮")
+    for b in baris_list:
+        pad = LEBAR - 2 - len(b)
+        print(G + "  │  " + W + b + " " * pad + G + "  │")
+    print(G + "  ╰" + "─" * LEBAR + "╯")
     print()
 
 
@@ -138,25 +228,24 @@ def tampilkan_user_bicara(teks: str):
 # DIVIDER
 # ==============================================================
 def tampilkan_divider():
-    print(C + DIM + "  " + "─" * 54)
+    print(C + DIM + "  " + "·" * 56)
 
 
 # ==============================================================
-# MENDENGARKAN — pulse indicator
+# MENDENGARKAN — pulse waveform
 # ==============================================================
+_WAVE = "▁▂▃▄▅▆▇█▇▆▅▄▃▂▁"
+
 def tampilkan_mendengarkan():
     print()
-    print(G + "  ╔" + "═" * 52 + "╗")
-    print(G + "  ║" + W + "        ◉  MENDENGARKAN — bicara sekarang      " + " " * 5 + G + "║")
-    print(G + "  ╚" + "═" * 52 + "╝")
+    garis = "═" * LEBAR
+    print(G + "  ╔" + garis + "╗")
+    print(G + "  ║  " + W + "◉  MENDENGARKAN" +
+          G + DIM + f"  {_WAVE}  " + RST + G + " " * 6 + "║")
+    print(G + "  ║  " + Fore.GREEN + DIM +
+          "  Silakan bicara sekarang..." + " " * 27 + G + "║")
+    print(G + "  ╚" + garis + "╝")
     print()
-
-
-# ==============================================================
-# MEMPROSES — Gemini
-# ==============================================================
-def tampilkan_memproses():
-    print(M + "  ⟳  Memproses via Gemini AI..." + RST)
 
 
 # ==============================================================
@@ -166,19 +255,19 @@ def pop_up_berita(daftar_berita: list):
     if not daftar_berita:
         return
     print()
-    print(Y + "  ╔══ " + W + "📡 BERITA TERKINI" + Y + " " + "═" * 33 + "╗")
+    lebar_b = LEBAR - 2
+    print(Y + "  ╔══ " + W + "📡 INTEL FEED" + Y + " " + "═" * (lebar_b - 15) + "╗")
     for i, berita in enumerate(daftar_berita, 1):
-        # Format baru: dict {judul, sumber, ...} | Lama: string
         if isinstance(berita, dict):
             sumber = berita.get("sumber", "")
             judul  = berita.get("judul", "")
             teks   = f"{sumber}: {judul}" if sumber else judul
         else:
             teks = str(berita)
-        pendek  = (teks[:50] + "..") if len(teks) > 52 else teks
-        padding = " " * (52 - len(pendek))
-        print(Y + "  ║ " + W + f"{i}. {pendek}" + padding + Y + " ║")
-    print(Y + "  ╚" + "═" * 54 + "╝")
+        pendek  = (teks[:lebar_b - 5] + "..") if len(teks) > lebar_b - 3 else teks
+        padding = " " * (lebar_b - 3 - len(pendek))
+        print(Y + "  ║ " + Fore.YELLOW + DIM + f"{i}. " + W + pendek + padding + Y + "║")
+    print(Y + "  ╚" + "═" * lebar_b + "╝")
     print()
 
 
@@ -187,11 +276,12 @@ def pop_up_berita(daftar_berita: list):
 # ==============================================================
 def tampilkan_browsing(query: str):
     print()
-    print(B + "  ╔══ " + W + "◎ BROWSING INTERNET" + B + " " + "═" * 30 + "╗")
-    pendek  = (query[:50] + "..") if len(query) > 52 else query
-    padding = " " * (52 - len(pendek))
-    print(B + "  ║  " + Fore.CYAN + f"🔍  {pendek}" + " " * (52 - len(pendek) - 4) + B + " ║")
-    print(B + "  ╚" + "═" * 54 + "╝")
+    print(B + "  ╔══ " + W + "◎ BROWSING INTERNET" + B + " " + "─" * (LEBAR - 21) + "╗")
+    baris_list = _wrap_teks(f"🔍  {query}", LEBAR - 4)
+    for b in baris_list:
+        pad = LEBAR - len(b)
+        print(B + "  ║  " + Fore.CYAN + b + " " * (pad - 2) + B + "║")
+    print(B + "  ╚" + "═" * LEBAR + "╝")
     print()
 
 
@@ -200,10 +290,10 @@ def tampilkan_browsing(query: str):
 # ==============================================================
 def tampilkan_vision():
     print()
-    print(M + "  ╔══ " + W + "◑ FRIDAY VISION — ANALISIS GAMBAR" + M + " " * 15 + "╗")
-    print(M + "  ║  " + W + "Kamera sedang diproses oleh Gemini Vision..." +
-          " " * 9 + M + " ║")
-    print(M + "  ╚" + "═" * 54 + "╝")
+    print(M + "  ╔══ " + W + "◑ FRIDAY VISION" + M + " " + "─" * (LEBAR - 17) + "╗")
+    print(M + "  ║  " + W + "Kamera aktif → Gemini Vision menganalisis..." +
+          " " * (LEBAR - 46) + M + "║")
+    print(M + "  ╚" + "═" * LEBAR + "╝")
     print()
 
 
@@ -212,11 +302,11 @@ def tampilkan_vision():
 # ==============================================================
 def tampilkan_app_dibuka(nama_app: str):
     print()
-    print(G + "  ╔══ " + W + "▶ MEMBUKA APLIKASI" + G + " " + "═" * 31 + "╗")
+    print(G + "  ╔══ " + W + "▶ MEMBUKA APLIKASI" + G + " " + "─" * (LEBAR - 20) + "╗")
     baris   = f"  Launching: {nama_app}"
-    padding = " " * (52 - len(baris))
-    print(G + "  ║" + W + baris + padding + G + " ║")
-    print(G + "  ╚" + "═" * 54 + "╝")
+    padding = " " * (LEBAR - len(baris))
+    print(G + "  ║" + W + baris + padding + G + "║")
+    print(G + "  ╚" + "═" * LEBAR + "╝")
     print()
 
 
@@ -226,14 +316,15 @@ def tampilkan_app_dibuka(nama_app: str):
 def tampilkan_musik(aksi: str, detail: str = ""):
     UNGU = Fore.MAGENTA + Style.BRIGHT
     print()
-    print(UNGU + "  ╔══ " + W + "♪ MUSIK KONTROL" + UNGU + " " + "═" * 34 + "╗")
-    baris = f"  {aksi}"
+    print(UNGU + "  ╔══ " + W + "♪ MUSIK KONTROL" + UNGU + " " + "─" * (LEBAR - 17) + "╗")
+    baris = f"  ▶ {aksi}"
     if detail:
         baris += f": {detail}"
-    pendek  = (baris[:50] + "..") if len(baris) > 52 else baris
-    padding = " " * (52 - len(pendek))
-    print(UNGU + "  ║" + W + pendek + padding + UNGU + " ║")
-    print(UNGU + "  ╚" + "═" * 54 + "╝")
+    baris_list = _wrap_teks(baris, LEBAR - 2)
+    for b in baris_list:
+        padding = " " * (LEBAR - len(b))
+        print(UNGU + "  ║" + W + b + padding + UNGU + "║")
+    print(UNGU + "  ╚" + "═" * LEBAR + "╝")
     print()
 
 
@@ -242,17 +333,21 @@ def tampilkan_musik(aksi: str, detail: str = ""):
 # ==============================================================
 def tampilkan_statistik(stats: dict):
     print()
-    print(G + "  ╔══ " + W + "📊 STATISTIK HARI INI" + G + " " + "═" * 29 + "╗")
+    print(G + "  ╔══ " + W + "📊 STATISTIK HARI INI" + G + " " + "─" * (LEBAR - 23) + "╗")
     items = [
-        ("Total Interaksi",   stats.get("interaksi", 0)),
-        ("Browsing Internet", stats.get("browsing",  0)),
-        ("Skill Lokal",       stats.get("skill",     0)),
-        ("Riset Mendalam",    stats.get("riset",     0)),
-        ("Deteksi Wajah",     stats.get("wajah",     0)),
+        ("💬", "Total Interaksi",   stats.get("interaksi", 0)),
+        ("🌐", "Browsing Internet", stats.get("browsing",  0)),
+        ("⚡", "Skill Lokal",       stats.get("skill",     0)),
+        ("🔬", "Riset Mendalam",    stats.get("riset",     0)),
+        ("👤", "Deteksi Wajah",     stats.get("wajah",     0)),
     ]
-    for label, nilai in items:
-        baris   = f"  • {label:<24} {nilai}"
-        padding = " " * (52 - len(baris))
-        print(G + "  ║" + W + baris + padding + G + " ║")
-    print(G + "  ╚" + "═" * 54 + "╝")
+    for ikon, label, nilai in items:
+        bar_max  = 18
+        bar_fill = min(int(nilai * 2), bar_max) if nilai else 0
+        bar      = "█" * bar_fill + "░" * (bar_max - bar_fill)
+        angka    = str(nilai)
+        sisa     = LEBAR - 4 - len(label) - len(bar) - len(angka) - 5
+        print(G + "  ║" + W + f"  {ikon} {label:<20} " +
+              G + bar + W + f" {angka}" + " " * max(0, sisa) + G + "║")
+    print(G + "  ╚" + "═" * LEBAR + "╝")
     print()

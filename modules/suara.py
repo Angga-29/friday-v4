@@ -30,7 +30,7 @@ import threading
 import subprocess
 from modules.tampilan import tampilkan_friday_bicara, tampilkan_status
 
-EDGE_VOICE = "id-ID-GadisNeural"
+EDGE_VOICE = "en-GB-RyanNeural"   # British male — paling mirip JARVIS
 
 _TMPDIR    = os.environ.get("TMPDIR") or os.path.dirname(os.path.abspath(__file__))
 TEMP_AUDIO = os.path.join(_TMPDIR, "friday_voice.mp3")
