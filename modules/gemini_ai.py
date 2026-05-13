@@ -150,6 +150,77 @@ class GeminiAI:
         teks = teks.replace("##", "").replace("#", "").replace("`", "")
         return teks.strip()
 
+    def tanya_stream(self, perintah: str):
+        """
+        Generator: yield potongan teks saat Gemini streaming.
+        Fallback ke tanya() biasa jika SDK tidak support stream.
+
+        Usage:
+            teks = ""
+            for chunk in ai.tanya_stream(prompt):
+                display(chunk)
+                teks += chunk
+        """
+        if not self._terhubung:
+            yield "Maaf, koneksi ke AI bermasalah."
+            return
+
+        teks_total = []
+        try:
+            if _SDK_MODE == "generativeai":
+                response = self.chat.send_message(perintah, stream=True)
+                for chunk in response:
+                    try:
+                        if chunk.text:
+                            # Bersihkan markdown per chunk (minimal)
+                            bagian = chunk.text.replace("**", "").replace("*", "")
+                            bagian = bagian.replace("##", "").replace("#", "")
+                            bagian = bagian.replace("`", "")
+                            teks_total.append(bagian)
+                            yield bagian
+                    except Exception:
+                        continue
+            else:
+                from google.genai import types
+                contents = self._history + [{"role": "user", "parts": [perintah]}]
+                stream = self._client.models.generate_content_stream(
+                    model=self._model_name,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        system_instruction=self._system,
+                        max_output_tokens=MAX_TOKENS,
+                        temperature=0.75,
+                    ),
+                )
+                for chunk in stream:
+                    try:
+                        if chunk.text:
+                            bagian = chunk.text.replace("**", "").replace("*", "")
+                            bagian = bagian.replace("##", "").replace("#", "")
+                            bagian = bagian.replace("`", "")
+                            teks_total.append(bagian)
+                            yield bagian
+                    except Exception:
+                        continue
+
+                # Update history untuk SDK genai (hanya setelah stream selesai)
+                teks_penuh = "".join(teks_total).strip()
+                if teks_penuh:
+                    self._history.append({"role": "user",  "parts": [perintah]})
+                    self._history.append({"role": "model", "parts": [teks_penuh]})
+                    if len(self._history) > 20:
+                        self._history = self._history[-20:]
+
+        except Exception as e:
+            err = str(e)
+            tampilkan_status(f"Stream error: {err[:80]}", "peringatan")
+            # Fallback: yield jawaban dari tanya() biasa
+            try:
+                jawaban = self.tanya(perintah)
+                yield jawaban
+            except Exception:
+                yield "Maaf, ada gangguan saat menghasilkan jawaban."
+
     def tanya(self, perintah: str) -> str:
         if not self._terhubung:
             return "Maaf, koneksi ke AI sedang bermasalah."

@@ -32,7 +32,9 @@ import config
 from modules.tampilan    import (
     tampilkan_header, tampilkan_status, tampilkan_divider,
     pop_up_berita, tampilkan_browsing, tampilkan_vision,
-    tampilkan_statistik, tampilkan_app_dibuka, tampilkan_musik
+    tampilkan_statistik, tampilkan_app_dibuka, tampilkan_musik,
+    mulai_bubble_stream, stream_chunk, tutup_bubble_stream,
+    stop_spinner,
 )
 from modules.suara       import bicara, stop_bicara, _sedang_bicara as _tts_event
 from modules.pendengar   import dengarkan
@@ -352,12 +354,23 @@ def proses_jawaban(suara_user, ai, memori, skill_manager):
             memori.catat_interaksi("browsing")
             return False
 
-        # ── 9. GEMINI CHAT (fallback utama) ──────────────────────────
+        # ── 9. GEMINI CHAT — streaming response ──────────────────────
         perintah = ai.bangun_konteks(
             suara_user=suara_user, waktu=cache_waktu,
             cuaca=cache_cuaca, berita=cache_berita
         )
-        jawaban = ai.tanya(perintah)
+
+        # Tampilkan jawaban kata-per-kata saat Gemini generate
+        mulai_bubble_stream()
+        teks_lengkap = ""
+        try:
+            for chunk in ai.tanya_stream(perintah):
+                stream_chunk(chunk)
+                teks_lengkap += chunk
+        finally:
+            tutup_bubble_stream()
+
+        jawaban = teks_lengkap.strip() or "Maaf, tidak ada jawaban dari AI."
         bicara(jawaban)
         memori.simpan_percakapan(suara_user, jawaban, tipe="chat")
         memori.catat_interaksi("interaksi")

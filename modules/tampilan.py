@@ -329,6 +329,108 @@ def tampilkan_musik(aksi: str, detail: str = ""):
 
 
 # ==============================================================
+# STREAMING BUBBLE — tampilkan jawaban Gemini secara live
+# ==============================================================
+_ss = {          # stream state
+    "aktif"   : False,
+    "buf"     : "",    # kata yang belum di-print
+    "line_len": 0,     # panjang baris aktif
+    "lebar"   : 52,    # lebar isi (diset saat mulai)
+}
+
+
+def mulai_bubble_stream():
+    """Cetak header bubble streaming — dipanggil SEBELUM iterasi chunks."""
+    stop_spinner()
+    _ss["aktif"]    = True
+    _ss["buf"]      = ""
+    _ss["line_len"] = 0
+    _ss["lebar"]    = LEBAR - 6   # padding kiri+kanan
+
+    print()
+    judul    = "◈ FRIDAY  ·  live"
+    garis_t  = "─" * (LEBAR - len(judul) - 4)
+    print(C + "  ╭─ " + W + judul + C + " " + garis_t + "╮")
+    sys.stdout.write(C + "  │  " + W)
+    sys.stdout.flush()
+
+
+def _cetak_kata(kata: str):
+    """Print satu kata ke baris aktif; wrap jika melebihi lebar."""
+    lebar   = _ss["lebar"]
+    spasi   = 1 if _ss["line_len"] > 0 else 0
+
+    if _ss["line_len"] + spasi + len(kata) > lebar:
+        # Pindah baris
+        sisa = lebar - _ss["line_len"]
+        sys.stdout.write(" " * sisa + C + "  │\n  │  " + W)
+        _ss["line_len"] = 0
+        spasi = 0
+
+    if spasi:
+        sys.stdout.write(" ")
+        _ss["line_len"] += 1
+
+    sys.stdout.write(kata)
+    _ss["line_len"] += len(kata)
+    sys.stdout.flush()
+
+
+def stream_chunk(chunk: str):
+    """
+    Terima potongan teks dari Gemini dan cetak word-by-word ke dalam bubble.
+    Dipanggil berulang saat iterasi generator tanya_stream().
+    """
+    if not _ss["aktif"] or not chunk:
+        return
+
+    _ss["buf"] += chunk
+
+    # Proses kata-kata yang sudah lengkap (dipisah spasi)
+    while True:
+        idx = _ss["buf"].find(" ")
+        if idx == -1:
+            break
+        kata = _ss["buf"][:idx].strip()
+        _ss["buf"] = _ss["buf"][idx + 1:]
+        if kata:
+            _cetak_kata(kata)
+
+    # Kata yang diakhiri newline → cetak dan bungkus baris
+    while "\n" in _ss["buf"]:
+        idx  = _ss["buf"].find("\n")
+        kata = _ss["buf"][:idx].strip()
+        _ss["buf"] = _ss["buf"][idx + 1:]
+        if kata:
+            _cetak_kata(kata)
+        sisa = _ss["lebar"] - _ss["line_len"]
+        sys.stdout.write(" " * sisa + C + "  │\n  │  " + W)
+        _ss["line_len"] = 0
+        sys.stdout.flush()
+
+
+def tutup_bubble_stream():
+    """Flush sisa kata + cetak footer bubble — dipanggil SETELAH stream selesai."""
+    if not _ss["aktif"]:
+        return
+
+    # Flush kata terakhir yang belum diprint
+    sisa_kata = _ss["buf"].strip()
+    if sisa_kata:
+        _cetak_kata(sisa_kata)
+    _ss["buf"] = ""
+
+    # Tutup baris terakhir
+    sisa_spasi = _ss["lebar"] - _ss["line_len"]
+    sys.stdout.write(" " * sisa_spasi + C + "  │\n")
+    print(C + "  ╰" + "─" * LEBAR + "╯")
+    print()
+
+    _ss["aktif"]    = False
+    _ss["line_len"] = 0
+
+
+# ==============================================================
 # STATISTIK
 # ==============================================================
 def tampilkan_statistik(stats: dict):
