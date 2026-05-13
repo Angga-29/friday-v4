@@ -125,8 +125,12 @@ def _putar_audio(file_path: str) -> bool:
         return False
 
     players = [
+        # --ao=opensles diperlukan di Android/Termux untuk output audio
         ("mpv",    ["mpv", "--no-video", "--volume=100",
-                    "--quiet", "--really-quiet", file_path]),
+                    "--ao=opensles", "--quiet", "--really-quiet", file_path]),
+        # Fallback: mpv dengan ao=android jika opensles tidak tersedia
+        ("mpv-ao-android", ["mpv", "--no-video", "--volume=100",
+                    "--ao=android", "--quiet", "--really-quiet", file_path]),
         ("ffplay", ["ffplay", "-nodisp", "-autoexit",
                     "-volume", "100", "-loglevel", "quiet", file_path]),
     ]

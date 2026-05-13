@@ -185,6 +185,10 @@ def tampilkan_memproses():
 # SPEECH BUBBLE FRIDAY — word-wrap proper
 # ==============================================================
 def tampilkan_friday_bicara(teks: str):
+    # Jika streaming bubble baru saja ditutup, jangan cetak ulang
+    if _ss.get("sudah_tampil"):
+        _ss["sudah_tampil"] = False
+        return
     stop_spinner()   # hentikan spinner kalau masih jalan
     print()
     lebar_isi = LEBAR - 4   # ruang teks dalam box
@@ -332,10 +336,11 @@ def tampilkan_musik(aksi: str, detail: str = ""):
 # STREAMING BUBBLE — tampilkan jawaban Gemini secara live
 # ==============================================================
 _ss = {          # stream state
-    "aktif"   : False,
-    "buf"     : "",    # kata yang belum di-print
-    "line_len": 0,     # panjang baris aktif
-    "lebar"   : 52,    # lebar isi (diset saat mulai)
+    "aktif"        : False,
+    "buf"          : "",    # kata yang belum di-print
+    "line_len"     : 0,     # panjang baris aktif
+    "lebar"        : 52,    # lebar isi (diset saat mulai)
+    "sudah_tampil" : False, # True setelah stream bubble ditutup — skip static bubble
 }
 
 
@@ -426,8 +431,9 @@ def tutup_bubble_stream():
     print(C + "  ╰" + "─" * LEBAR + "╯")
     print()
 
-    _ss["aktif"]    = False
-    _ss["line_len"] = 0
+    _ss["aktif"]        = False
+    _ss["line_len"]     = 0
+    _ss["sudah_tampil"] = True   # beritahu bicara() agar tidak cetak bubble duplikat
 
 
 # ==============================================================

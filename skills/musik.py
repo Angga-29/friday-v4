@@ -104,7 +104,8 @@ def _kontrol_media(aksi: str) -> bool:
             pass
 
     # ── Metode 3: input keyevent (fallback terakhir) ───────────────
-    kode = {"play_pause": "85", "pause": "85", "play": "85",
+    # 85=MEDIA_PLAY_PAUSE (toggle), 126=MEDIA_PLAY (explicit), 127=MEDIA_PAUSE
+    kode = {"play_pause": "85", "pause": "127", "play": "126",
             "next": "87", "previous": "88"}.get(aksi)
     if kode:
         try:
@@ -134,7 +135,9 @@ def _atur_volume(arah: str) -> str:
 def _buka_spotify() -> bool:
     pkg = "com.spotify.music"
     for cmd in [
-        ["am", "start", pkg],
+        # Syntax am start yang benar untuk Termux/Android
+        ["am", "start", "-a", "android.intent.action.MAIN",
+         "-c", "android.intent.category.LAUNCHER", "-p", pkg],
         ["monkey", "-p", pkg, "-c", "android.intent.category.LAUNCHER", "1"],
     ]:
         try:

@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dokumentasi Project Friday v4.0</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap');
+
+  :root {
+    --cyan: #00e5ff;
+    --blue: #1565c0;
+    --dark: #0a0e1a;
+    --darker: #060a12;
+    --card: #0d1528;
+    --border: #1a3a5c;
+    --text: #cdd6e8;
+    --accent: #00b4d8;
+    --green: #00e676;
+    --yellow: #ffd600;
+    --red: #ff1744;
+    --magenta: #e040fb;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--darker);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  /* ── COVER PAGE ── */
+  .cover {
+    height: 100vh;
+    min-height: 800px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(160deg, #020818 0%, #0a1628 40%, #0d1e3a 100%);
+    border-bottom: 3px solid var(--cyan);
+    page-break-after: always;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 20% 80%, rgba(0,180,216,0.08) 0%, transparent 60%),
+      radial-gradient(circle at 80% 20%, rgba(0,100,200,0.10) 0%, transparent 55%);
+  }
+  .cover-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .cover-content { position: relative; text-align: center; }
+
+  .friday-logo {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 88px;
+    font-weight: 900;
+    letter-spacing: 18px;
+    color: var(--cyan);
+    text-shadow:
+      0 0 30px rgba(0,229,255,0.6),
+      0 0 80px rgba(0,229,255,0.2);
+    margin-bottom: 8px;
+  }
+  .version-tag {
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--accent);
+    font-size: 16px;
+    letter-spacing: 6px;
+    margin-bottom: 36px;
+  }
+  .cover-subtitle {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 4px;
+    margin-bottom: 16px;
+  }
+  .cover-tagline {
+    font-size: 15px;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 2px;
+    margin-bottom: 60px;
+  }
+  .cover-meta {
+    display: flex;
+    gap: 32px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .cover-meta-item {
+    background: rgba(0,229,255,0.05);
+    border: 1px solid rgba(0,229,255,0.2);
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--cyan);
+    letter-spacing: 2px;
+  }
+  .cover-meta-item span { color: #fff; }
+
+  /* ── LAYOUT ── */
+  .page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 60px 40px;
+    page-break-before: always;
+  }
+
+  /* ── SECTION TITLE ── */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 32px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-num {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--cyan);
+    background: rgba(0,229,255,0.1);
+    border: 1px solid rgba(0,229,255,0.3);
+    padding: 3px 8px;
+    border-radius: 3px;
+    letter-spacing: 2px;
+  }
+  .section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 3px;
+  }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px 28px;
+    margin-bottom: 20px;
+  }
+  .card-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--cyan);
+    letter-spacing: 2px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .card-title .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan);
+    flex-shrink: 0;
+  }
+
+  /* ── TABLE ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+  }
+  th {
+    background: rgba(0,180,216,0.12);
+    color: var(--cyan);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 9px 14px;
+    border-bottom: 1px solid rgba(26,58,92,0.5);
+    font-size: 14px;
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(0,229,255,0.03); }
+  td code {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--cyan);
+    background: rgba(0,229,255,0.08);
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+
+  /* ── CODE BLOCK ── */
+  .code-block {
+    background: #080e1c;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--cyan);
+    border-radius: 6px;
+    padding: 16px 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12.5px;
+    color: #a8c8e8;
+    overflow-x: auto;
+    margin: 12px 0;
+    white-space: pre;
+    line-height: 1.8;
+  }
+  .code-block .kw  { color: var(--cyan); }
+  .code-block .str { color: var(--green); }
+  .code-block .cmt { color: #4a6080; font-style: italic; }
+
+  /* ── TAGS / BADGES ── */
+  .badge {
+    display: inline-block;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin: 2px;
+  }
+  .badge-green  { background: rgba(0,230,118,0.15);  color: var(--green);   border: 1px solid rgba(0,230,118,0.3); }
+  .badge-cyan   { background: rgba(0,229,255,0.12);  color: var(--cyan);    border: 1px solid rgba(0,229,255,0.3); }
+  .badge-yellow { background: rgba(255,214,0,0.12);  color: var(--yellow);  border: 1px solid rgba(255,214,0,0.3); }
+  .badge-red    { background: rgba(255,23,68,0.12);  color: var(--red);     border: 1px solid rgba(255,23,68,0.3); }
+  .badge-mag    { background: rgba(224,64,251,0.12); color: var(--magenta); border: 1px solid rgba(224,64,251,0.3); }
+
+  /* ── FLOW DIAGRAM ── */
+  .flow {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 16px 0;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+  }
+  .flow-box {
+    background: rgba(0,180,216,0.10);
+    border: 1px solid rgba(0,180,216,0.35);
+    border-radius: 5px;
+    padding: 6px 14px;
+    color: var(--cyan);
+    white-space: nowrap;
+  }
+  .flow-arrow {
+    color: rgba(0,229,255,0.4);
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  /* ── GRID ── */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  /* ── HIGHLIGHT BOX ── */
+  .highlight {
+    background: rgba(0,229,255,0.05);
+    border: 1px solid rgba(0,229,255,0.2);
+    border-left: 4px solid var(--cyan);
+    border-radius: 0 6px 6px 0;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  .highlight.warn {
+    background: rgba(255,214,0,0.05);
+    border-color: rgba(255,214,0,0.2);
+    border-left-color: var(--yellow);
+  }
+
+  /* ── FILE PATH ── */
+  .filepath {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11.5px;
+    color: var(--magenta);
+    background: rgba(224,64,251,0.08);
+    padding: 2px 8px;
+    border-radius: 3px;
+  }
+
+  /* ── SECTION DIVIDER ── */
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    margin: 40px 0;
+  }
+
+  p { margin-bottom: 10px; }
+  ul, ol { padding-left: 22px; margin-bottom: 10px; }
+  li { margin-bottom: 4px; }
+  strong { color: #fff; font-weight: 700; }
+
+  /* ── PRINT ── */
+  @media print {
+    body { background: #fff; color: #000; }
+    .cover { height: auto; min-height: unset; padding: 80px 40px; background: #fff; border-bottom: 3px solid #000; }
+    .cover-grid { display: none; }
+    .friday-logo { color: #000; text-shadow: none; }
+    .version-tag, .cover-subtitle, .cover-tagline { color: #333; }
+    .cover-meta-item { border-color: #ccc; color: #000; background: #f5f5f5; }
+    .cover-meta-item span { color: #000; }
+    .section-title { color: #000; }
+    .section-num { color: #000; background: #eee; border-color: #ccc; }
+    .card { background: #f9f9f9; border-color: #ddd; }
+    .card-title { color: #000; }
+    .card-title .dot { background: #000; box-shadow: none; }
+    table th { background: #eee; color: #000; }
+    td, th { border-color: #ddd; }
+    td code { color: #000; background: #f0f0f0; }
+    .code-block { background: #f5f5f5; border-color: #ccc; color: #222; }
+    .code-block .kw  { color: #1565c0; }
+    .code-block .str { color: #2e7d32; }
+    .code-block .cmt { color: #777; }
+    .badge-green  { background: #e8f5e9; color: #2e7d32; border-color: #a5d6a7; }
+    .badge-cyan   { background: #e0f7fa; color: #00838f; border-color: #80deea; }
+    .badge-yellow { background: #fffde7; color: #f57f17; border-color: #fff176; }
+    .badge-mag    { background: #fce4ec; color: #880e4f; border-color: #f48fb1; }
+    .flow-box     { background: #f0f8ff; border-color: #90caf9; color: #1565c0; }
+    .highlight    { background: #e0f7fa; border-color: #80deea; border-left-color: #0097a7; }
+    .highlight.warn { background: #fffde7; border-left-color: #f57f17; }
+    .filepath     { color: #880e4f; background: #fce4ec; }
+    .divider      { background: #ddd; }
+    .cover-content h1, .cover-content h2 { color: #000; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════ COVER -->
+<div class="cover">
+  <div class="cover-grid"></div>
+  <div class="cover-content">
+    <div class="friday-logo">FRIDAY</div>
+    <div class="version-tag">VERSION 4.0.0  ·  JARVIS-STYLE AI ASSISTANT</div>
+    <div class="cover-subtitle">DOKUMENTASI TEKNIS LENGKAP</div>
+    <div class="cover-tagline">AI Personal Assistant · Termux/Android · Gemini 2.5 Flash · Offline-Capable</div>
+    <div class="cover-meta">
+      <div class="cover-meta-item">PLATFORM <span>Termux / Android</span></div>
+      <div class="cover-meta-item">DEVICE <span>Xiaomi Pad 7</span></div>
+      <div class="cover-meta-item">AI ENGINE <span>Gemini 2.5 Flash</span></div>
+      <div class="cover-meta-item">PEMILIK <span>Angga</span></div>
+      <div class="cover-meta-item">TANGGAL <span>Mei 2026</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ SECTION 1: OVERVIEW -->
+<div class="page">
+  <div class="section-header">
+    <span class="section-num">01</span>
+    <span class="section-title">GAMBARAN UMUM</span>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>APA ITU FRIDAY?</div>
+    <p>
+      <strong>FRIDAY</strong> (Framework for Intelligent Response and Decision Automation for You) adalah AI personal assistant berbasis Python yang berjalan di Termux pada Android. Terinspirasi dari asisten JARVIS/FRIDAY milik Tony Stark di film Iron Man, FRIDAY dirancang untuk menjadi partner kerja cerdas yang dapat diajak bicara, mengontrol aplikasi, mencari informasi real-time, dan merespons dengan suara.
+    </p>
+    <p>
+      Friday berjalan sepenuhnya di perangkat Xiaomi Pad 7 tanpa memerlukan komputer tambahan, menggabungkan kecerdasan <strong>Google Gemini 2.5 Flash</strong> dengan kemampuan lokal melalui <strong>Ollama</strong> sebagai fallback saat offline.
+    </p>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>KEMAMPUAN UTAMA</div>
+      <ul>
+        <li>Percakapan natural berbahasa Indonesia</li>
+        <li>Suara JARVIS (Edge-TTS British Male)</li>
+        <li>Aktivasi via wake word "Hai Friday"</li>
+        <li>Kontrol aplikasi Android (34+ app)</li>
+        <li>Browsing internet real-time</li>
+        <li>Riset mendalam multi-langkah</li>
+        <li>Informasi cuaca &amp; berita live</li>
+        <li>Vision via kamera IP Webcam</li>
+        <li>Memori percakapan permanen (SQLite)</li>
+        <li>Mode offline via Ollama lokal</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>TEKNOLOGI YANG DIGUNAKAN</div>
+      <ul>
+        <li><span class="badge badge-cyan">Gemini 2.5 Flash</span> AI utama</li>
+        <li><span class="badge badge-mag">Ollama qwen2:1.5b</span> AI offline</li>
+        <li><span class="badge badge-green">Edge-TTS</span> Text-to-Speech</li>
+        <li><span class="badge badge-cyan">SpeechRecognition</span> Voice input</li>
+        <li><span class="badge badge-yellow">mpv / ffplay</span> Audio player</li>
+        <li><span class="badge badge-green">SQLite</span> Memori permanen</li>
+        <li><span class="badge badge-cyan">DuckDuckGo</span> Web search</li>
+        <li><span class="badge badge-mag">IP Webcam</span> Vision camera</li>
+        <li><span class="badge badge-green">Colorama</span> Terminal UI</li>
+        <li><span class="badge badge-yellow">Termux:API</span> Android bridge</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="section-header" style="margin-top:40px;">
+    <span class="section-num">—</span>
+    <span class="section-title" style="font-size:16px;">ALUR KERJA UTAMA</span>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>PIPELINE INPUT → OUTPUT</div>
+    <div class="flow">
+      <div class="flow-box">🎤 Suara User</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">Wake Word</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">Speech-to-Text</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">Skill Router</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">Gemini AI</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">Edge-TTS</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">🔊 Suara Friday</div>
+    </div>
+    <div class="flow">
+      <div class="flow-box">📋 Skill Lokal</div>
+      <div class="flow-arrow">↗</div>
+      <div class="flow-box">🌐 Web Browsing</div>
+      <div class="flow-arrow">↗</div>
+      <div class="flow-box">🔬 Riset Mendalam</div>
+      <div class="flow-arrow">↗</div>
+      <div class="flow-box">👁️ Vision Kamera</div>
+      <div class="flow-arrow">↗</div>
+      <div class="flow-box">💾 Memori SQLite</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ SECTION 2: ARSITEKTUR -->
+<div class="page">
+  <div class="section-header">
+    <span class="section-num">02</span>
+    <span class="section-title">ARSITEKTUR SISTEM</span>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>STRUKTUR FILE DAN DIREKTORI</div>
+    <div class="code-block"><span class="cmt">friday-v4/
+├── main.py                  ← Loop utama, inisialisasi semua modul
+├── config.py                ← Konfigurasi API keys, persona, Ollama
+│
+├── modules/                 ← Modul inti Friday
+│   ├── gemini_ai.py         ← Wrapper Google Gemini 2.5 Flash
+│   ├── lokal_ai.py          ← Wrapper Ollama (AI offline fallback)
+│   ├── suara.py             ← Text-to-Speech (Edge-TTS → Termux → gTTS)
+│   ├── pendengar.py         ← Speech-to-Text (Google Speech Recognition)
+│   ├── tampilan.py          ← Terminal UI JARVIS-style + streaming bubble
+│   ├── info.py              ← Cuaca (OpenWeatherMap) + Berita (NewsAPI)
+│   ├── dashboard.py         ← Web dashboard di Chrome (HTML/JS)
+│   ├── memori.py            ← SQLite memori percakapan &amp; preferensi
+│   ├── browser.py           ← DuckDuckGo search + format hasil
+│   ├── riset.py             ← Deep research multi-langkah
+│   ├── penglihatan.py       ← Gemini Vision via kamera
+│   ├── kamera.py            ← Ambil frame dari IP Webcam
+│   ├── wajah.py             ← Pengenalan wajah (OpenCV)
+│   ├── proaktif.py          ← Mode proaktif + morning digest
+│   ├── wake_word.py         ← Deteksi "Hai Friday" background thread
+│   └── tepuk.py             ← Deteksi tepuk tangan (barge-in)
+│
+└── skills/                  ← Skill lokal (dieksekusi sebelum Gemini)
+    ├── __init__.py          ← SkillManager: load &amp; route semua skill
+    ├── aplikasi.py          ← Buka 34+ aplikasi Android
+    ├── musik.py             ← Kontrol Spotify + musik lokal via mpv
+    ├── kalkulator.py        ← Kalkulator ekspresi matematika
+    ├── pengingat.py         ← Timer &amp; pengingat
+    ├── cek_sistem.py        ← Diagnostik sistem Friday
+    └── web.py               ← Buka browser, berita, Google</span></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>THREAD YANG BERJALAN</div>
+      <table>
+        <tr><th>Thread</th><th>Fungsi</th></tr>
+        <tr><td>MainLoop</td><td>Loop utama + proses jawaban</td></tr>
+        <tr><td>WakeWord</td><td>Deteksi "Hai Friday" terus-menerus</td></tr>
+        <tr><td>DoublClap</td><td>Deteksi tepuk barge-in</td></tr>
+        <tr><td>Proaktif</td><td>Morning digest + notifikasi otomatis</td></tr>
+        <tr><td>PeriodicRefresh</td><td>Update cuaca+berita tiap 30 menit</td></tr>
+        <tr><td>EdgeTTS</td><td>Generate audio di asyncio loop sendiri</td></tr>
+        <tr><td>Spinner</td><td>Animasi braille saat AI berpikir</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>PRIORITAS ROUTING SKILL</div>
+      <table>
+        <tr><th>Prioritas</th><th>Skill</th></tr>
+        <tr><td><span class="badge badge-red">P2</span></td><td>cek_sistem — diagnostik Friday</td></tr>
+        <tr><td><span class="badge badge-yellow">P3</span></td><td>kalkulator — hitung matematika</td></tr>
+        <tr><td><span class="badge badge-cyan">P4</span></td><td>web — buka browser &amp; berita</td></tr>
+        <tr><td><span class="badge badge-green">P5</span></td><td>aplikasi — buka app Android</td></tr>
+        <tr><td><span class="badge badge-mag">P7</span></td><td>pengingat — timer &amp; alarm</td></tr>
+        <tr><td><span class="badge badge-cyan">P8</span></td><td>musik — Spotify &amp; mpv lokal</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ SECTION 3: MODUL DETAIL -->
+<div class="page">
+  <div class="section-header">
+    <span class="section-num">03</span>
+    <span class="section-title">DETAIL SETIAP MODUL</span>
+  </div>
+
+  <!-- gemini_ai.py -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>modules/gemini_ai.py — AI UTAMA (GEMINI 2.5 FLASH)</div>
+    <p>Wrapper untuk Google Gemini API. Mendukung dua SDK: <code>google-generativeai</code> (legacy) dan <code>google-genai</code> (baru). Otomatis mendeteksi SDK yang terinstall.</p>
+    <div class="grid-2">
+      <div>
+        <strong>Method utama:</strong>
+        <ul>
+          <li><code>tanya(perintah)</code> — Tanya Gemini, return string</li>
+          <li><code>tanya_stream(perintah)</code> — Generator, yield teks per chunk (streaming)</li>
+          <li><code>tanya_riset(perintah)</code> — Tanya dengan token limit lebih besar (1200 token)</li>
+          <li><code>tanya_dengan_web(q, ctx)</code> — Tanya dengan konteks web</li>
+          <li><code>bangun_konteks(...)</code> — Gabungkan input user + waktu + cuaca + berita</li>
+          <li><code>reset_sesi()</code> — Hapus history percakapan</li>
+        </ul>
+      </div>
+      <div>
+        <strong>Fitur:</strong>
+        <ul>
+          <li>Fallback: Gemini 2.5 Flash → 1.5 Flash otomatis</li>
+          <li>History percakapan (maks 20 pesan)</li>
+          <li>Streaming response word-by-word</li>
+          <li>Integrasi memori SQLite ke system prompt</li>
+          <li>Max token: 600 (chat) / 1200 (riset)</li>
+          <li>Temperature: 0.75, top_p: 0.95</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- lokal_ai.py -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>modules/lokal_ai.py — AI OFFLINE (OLLAMA)</div>
+    <p>Wrapper Ollama untuk mode offline. Interface identik dengan GeminiAI sehingga <code>main.py</code> dapat switch tanpa perubahan kode.</p>
+    <div class="grid-2">
+      <div>
+        <strong>Cara kerja:</strong>
+        <ul>
+          <li>Saat startup, cek port Ollama via socket (port 11434)</li>
+          <li>Verifikasi model sudah di-pull via <code>/api/tags</code></li>
+          <li>Jika internet mati, <code>_pilih_ai()</code> di main.py otomatis pakai Ollama</li>
+          <li>Streaming via NDJSON <code>/api/chat?stream=true</code></li>
+        </ul>
+      </div>
+      <div>
+        <strong>Model yang direkomendasikan:</strong>
+        <ul>
+          <li><code>qwen2:1.5b</code> — ~1GB, cepat, bahasa Indonesia baik</li>
+          <li><code>tinyllama</code> — ~600MB, paling ringan</li>
+          <li><code>phi3:mini</code> — ~2.3GB, lebih pintar</li>
+        </ul>
+        <p><strong>Install:</strong> <code>pkg install ollama</code> di Termux</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- suara.py -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>modules/suara.py — TEXT-TO-SPEECH</div>
+    <p>Sistem TTS berlapis dengan fallback otomatis. Voice: <strong>en-GB-RyanNeural</strong> (British male, paling mirip JARVIS).</p>
+    <div class="flow">
+      <div class="flow-box">Edge-TTS<br><small>Online, terbaik</small></div>
+      <div class="flow-arrow">→ gagal →</div>
+      <div class="flow-box">Termux TTS<br><small>Offline, native</small></div>
+      <div class="flow-arrow">→ gagal →</div>
+      <div class="flow-box">gTTS<br><small>Google, online</small></div>
+    </div>
+    <div class="flow">
+      <div class="flow-box">mpv --ao=opensles<br><small>Android audio</small></div>
+      <div class="flow-arrow">→ gagal →</div>
+      <div class="flow-box">mpv --ao=android<br><small>Fallback</small></div>
+      <div class="flow-arrow">→ gagal →</div>
+      <div class="flow-box">ffplay<br><small>Fallback akhir</small></div>
+    </div>
+    <p><strong>Anti-echo:</strong> <code>_sedang_bicara</code> (threading.Event) di-set sebelum audio diputar, di-clear setelah selesai. Modul pendengar &amp; wake_word membaca flag ini untuk tidak mendengarkan suara Friday sendiri.</p>
+    <p><strong>Barge-in:</strong> <code>stop_bicara()</code> dapat diinterrupt dari thread manapun. Mendukung double-clap untuk memotong jawaban Friday di tengah.</p>
+  </div>
+
+  <!-- tampilan.py -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>modules/tampilan.py — TERMINAL UI JARVIS-STYLE</div>
+    <p>Semua output visual di terminal menggunakan box-drawing characters dan Colorama untuk tampilan JARVIS. Versi 6.0 dengan animated spinner dan streaming bubble.</p>
+    <table>
+      <tr><th>Function</th><th>Deskripsi</th></tr>
+      <tr><td><code>tampilkan_header()</code></td><td>Header besar dengan ASCII art FRIDAY + status semua sistem</td></tr>
+      <tr><td><code>tampilkan_status(pesan, tipe)</code></td><td>Log baris dengan ikon dan warna per tipe (info/sukses/error/browsing/dll)</td></tr>
+      <tr><td><code>mulai_spinner(pesan)</code></td><td>Animasi spinner braille ⠋⠙⠸⠴ di background thread</td></tr>
+      <tr><td><code>tampilkan_friday_bicara(teks)</code></td><td>Speech bubble dengan box-drawing + word-wrap otomatis</td></tr>
+      <tr><td><code>mulai_bubble_stream()</code></td><td>Buka streaming bubble — dipanggil sebelum iterasi chunks</td></tr>
+      <tr><td><code>stream_chunk(chunk)</code></td><td>Print kata per kata ke dalam streaming bubble real-time</td></tr>
+      <tr><td><code>tutup_bubble_stream()</code></td><td>Flush sisa kata, tutup bubble, set flag sudah_tampil</td></tr>
+      <tr><td><code>pop_up_berita(list)</code></td><td>Panel berita kuning dengan judul dari list[dict]</td></tr>
+      <tr><td><code>tampilkan_statistik(stats)</code></td><td>Panel statistik dengan progress bar tiap kategori</td></tr>
+    </table>
+    <div class="highlight">
+      <strong>Streaming anti-duplikat:</strong> Setelah <code>tutup_bubble_stream()</code>, flag <code>_ss["sudah_tampil"]</code> = True. <code>tampilkan_friday_bicara()</code> akan skip print jika flag ini aktif, sehingga jawaban tidak ditampilkan dua kali.
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ SECTION 4: MODUL LANJUTAN -->
+<div class="page">
+  <div class="section-header">
+    <span class="section-num">04</span>
+    <span class="section-title">MODUL LANJUTAN</span>
+  </div>
+
+  <!-- info.py -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>modules/info.py — INFORMASI REAL-TIME</div>
+    <div class="grid-2">
+      <div>
+        <strong>Cuaca (OpenWeatherMap):</strong>
+        <ul>
+          <li><code>dapatkan_cuaca(api_key, kota)</code> → string deskripsi</li>
+          <li><code>dapatkan_cuaca_data()</code> → dict untuk dashboard (suhu, ikon, angin)</li>
+          <li>API gratis, kota default: Jakarta, ID</li>
+        </ul>
+        <strong>Waktu:</strong>
+        <ul>
+          <li><code>dapatkan_waktu()</code> → string jam + hari + tanggal</li>
+        </ul>
+      </div>
+      <div>
+        <strong>Berita (NewsAPI RSS):</strong>
+        <ul>
+          <li><code>dapatkan_berita(api_key, jumlah)</code> → <code>list[dict]</code></li>
+          <li>Setiap item: <code>{judul, sumber, waktu, ringkasan, url}</code></li>
+          <li>Waktu relatif: "5 menit lalu", "2 jam lalu"</li>
+          <li>HTML distrip dari ringkasan secara otomatis</li>
+          <li>Sumber: CNN Indonesia, Kompas, Detik, CNBC, dll</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- dashboard.py -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>modules/dashboard.py — WEB DASHBOARD CHROME</div>
+    <p>Dashboard HTML real-time yang dibuka di Chrome/browser. Menampilkan waktu, cuaca, berita terkini, dan status Friday. Diupdate otomatis via JSON yang ditulis ke file lokal.</p>
+    <ul>
+      <li><strong>Kartu berita:</strong> Klik "Buka →" untuk membuka artikel di browser</li>
+      <li><strong>Status real-time:</strong> Standby / Mendengarkan / Memproses / Berbicara</li>
+      <li><strong>Tombol Stop:</strong> Muncul saat Friday berbicara, interruptible</li>
+      <li><strong>Cuaca visual:</strong> Ikon kondisi + suhu + angin + kelembaban</li>
+      <li><strong>Auto-refresh:</strong> Data diperbarui setiap 30 menit via PeriodicRefresh thread</li>
+    </ul>
+  </div>
+
+  <!-- memori.py -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>modules/memori.py — MEMORI PERMANEN (SQLite)</div>
+    <p>Semua percakapan dan preferensi disimpan permanen di file SQLite <code>data/friday_memory.db</code>.</p>
+    <table>
+      <tr><th>Tabel</th><th>Isi</th><th>Method</th></tr>
+      <tr><td>percakapan</td><td>Semua tanya-jawab dengan timestamp &amp; tipe</td><td><code>simpan_percakapan(), ambil_percakapan_terakhir(n)</code></td></tr>
+      <tr><td>preferensi</td><td>Key-value preferensi user ("ingat bahwa...")</td><td><code>simpan_preferensi(), ambil_preferensi(kunci)</code></td></tr>
+      <tr><td>statistik</td><td>Counter harian: interaksi, browsing, skill, riset</td><td><code>catat_interaksi(tipe), statistik_hari_ini()</code></td></tr>
+    </table>
+    <p>Auto-prune: percakapan lebih dari 30 hari dihapus otomatis untuk menjaga ukuran database.</p>
+  </div>
+
+  <!-- browser.py + riset.py -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>modules/browser.py</div>
+      <p><strong>DuckDuckGo search</strong> untuk pertanyaan yang membutuhkan info real-time.</p>
+      <ul>
+        <li><code>perlu_browsing(teks)</code> — deteksi apakah pertanyaan butuh browsing</li>
+        <li><code>cari_web(query)</code> — cari via DuckDuckGo, return list hasil</li>
+        <li><code>format_untuk_gemini(q, hasil)</code> — format konteks untuk Gemini</li>
+        <li>Trigger: kata seperti "sekarang", "hari ini", "terbaru", "berita", "harga"</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>modules/riset.py</div>
+      <p><strong>Riset mendalam</strong> 3 langkah untuk pertanyaan kompleks.</p>
+      <ul>
+        <li><code>perlu_riset(teks)</code> — deteksi pertanyaan butuh riset mendalam</li>
+        <li><code>riset_mendalam(pertanyaan, ai)</code> — 3 pencarian → sintesis Gemini</li>
+        <li>Trigger: "jelaskan", "analisis", "bandingkan", "riset", "pelajari"</li>
+        <li>Menggunakan <code>tanya_riset()</code> dengan 1200 token output</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- proaktif.py -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>modules/proaktif.py — MODE PROAKTIF</div>
+    <p>Friday dapat berbicara proaktif tanpa dipanggil, seperti JARVIS yang memberikan laporan pagi.</p>
+    <ul>
+      <li><strong>Morning Digest:</strong> Saat startup atau pagi hari, Friday menyapa + laporan cuaca + berita penting</li>
+      <li><strong>Notifikasi otomatis:</strong> Jika ada berita penting atau kondisi cuaca ekstrem</li>
+      <li>Berjalan di background thread, tidak mengganggu operasi utama</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ SECTION 5: SKILLS -->
+<div class="page">
+  <div class="section-header">
+    <span class="section-num">05</span>
+    <span class="section-title">SISTEM SKILL LOKAL</span>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>KONSEP SKILL SYSTEM</div>
+    <p>
+      Terinspirasi dari OpenJarvis, Skill adalah modul Python independen yang dieksekusi <strong>sebelum Gemini</strong>. Ini membuat respons jauh lebih cepat untuk perintah umum (buka app, putar musik, hitung) karena tidak perlu round-trip ke API cloud.
+    </p>
+    <p>
+      <code>SkillManager</code> di <span class="filepath">skills/__init__.py</span> memuat semua skill secara dinamis, mengurutkan berdasarkan prioritas, dan mencari skill yang cocok dengan input user menggunakan keyword matching.
+    </p>
+    <div class="highlight">
+      Jika skill cocok dan tidak return <code>None</code> → jawaban skill dipakai, Gemini tidak dipanggil sama sekali.
+      Jika semua skill return <code>None</code> → diteruskan ke Gemini.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>skills/aplikasi.py — 34+ APLIKASI ANDROID</div>
+    <p>Membuka aplikasi Android via <code>am start</code> (Android Activity Manager).</p>
+    <div class="grid-3">
+      <div>
+        <strong>Sosial Media:</strong>
+        <ul>
+          <li>WhatsApp, Instagram</li>
+          <li>Twitter / X, Facebook</li>
+          <li>LINE, Discord, Telegram</li>
+          <li>TikTok</li>
+        </ul>
+      </div>
+      <div>
+        <strong>E-Wallet &amp; Banking:</strong>
+        <ul>
+          <li>GoPay / GoJek</li>
+          <li>OVO, Dana</li>
+          <li>BCA mobile, BRImo</li>
+          <li>Mandiri Online</li>
+        </ul>
+      </div>
+      <div>
+        <strong>Produktivitas:</strong>
+        <ul>
+          <li>Gmail, Zoom</li>
+          <li>Google Maps</li>
+          <li>YouTube, Play Store</li>
+          <li>Clock, Spotify</li>
+          <li>YouTube Music</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>skills/musik.py — KONTROL MUSIK</div>
+    <p>Mengontrol Spotify dan memutar musik lokal via mpv.</p>
+    <div class="grid-2">
+      <div>
+        <strong>Kontrol Spotify (3 metode fallback):</strong>
+        <ol>
+          <li><code>termux-media-player</code> via MediaSession Android (terbaik)</li>
+          <li>Spotify broadcast intent langsung</li>
+          <li><code>input keyevent</code> — PLAY:126, PAUSE:127, NEXT:87, PREV:88</li>
+        </ol>
+      </div>
+      <div>
+        <strong>Buka Spotify:</strong>
+        <div class="code-block"><span class="kw">am start</span> -a android.intent.action.MAIN
+  -c android.intent.category.LAUNCHER
+  -p com.spotify.music</div>
+      </div>
+    </div>
+    <p><strong>Musik lokal:</strong> Mencari file MP3/FLAC/M4A di <code>/sdcard/Music</code> dan memutar via mpv dengan shuffle playlist.</p>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>skills/web.py — BROWSER &amp; BERITA</div>
+      <ul>
+        <li>"buka berita pertama/ke-2" → URL dari cache berita</li>
+        <li>"buka google", "cari X di google" → Chrome ke Google</li>
+        <li>"buka kompas/detik/bbc" → portal berita Indonesia</li>
+        <li>"buka domain.com" → deteksi URL via regex</li>
+        <li>Prioritas 4 — lebih tinggi dari aplikasi.py</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>skills/kalkulator.py</div>
+      <ul>
+        <li>Hitung ekspresi matematika langsung tanpa AI</li>
+        <li>Trigger: "hitung", "berapa", "+", "-", "*", "/", "%"</li>
+        <li>Safe eval: hanya operator matematika diizinkan</li>
+        <li>Mendukung: pangkat, modulo, desimal</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ SECTION 6: KONFIGURASI -->
+<div class="page">
+  <div class="section-header">
+    <span class="section-num">06</span>
+    <span class="section-title">KONFIGURASI DAN API KEYS</span>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>config.py — SEMUA KONFIGURASI</div>
+    <table>
+      <tr><th>Variabel</th><th>Default</th><th>Deskripsi</th></tr>
+      <tr><td><code>URL_KAMERA</code></td><td>IP Webcam URL</td><td>URL kamera Android via IP Webcam app</td></tr>
+      <tr><td><code>KAMERA_WAJIB</code></td><td><code>false</code></td><td>Jika false, Friday jalan tanpa kamera</td></tr>
+      <tr><td><code>API_KEY_GEMINI</code></td><td>—</td><td>Google Gemini API key (gratis di AI Studio)</td></tr>
+      <tr><td><code>API_KEY_CUACA</code></td><td>—</td><td>OpenWeatherMap API key (gratis)</td></tr>
+      <tr><td><code>API_KEY_BERITA</code></td><td>—</td><td>NewsAPI key (gratis untuk developer)</td></tr>
+      <tr><td><code>NAMA_PENGGUNA</code></td><td>Angga</td><td>Nama pemilik — dipakai di sapaan &amp; persona</td></tr>
+      <tr><td><code>KOTA_CUACA</code></td><td>Jakarta,ID</td><td>Kota untuk data cuaca</td></tr>
+      <tr><td><code>OLLAMA_HOST</code></td><td>localhost:11434</td><td>URL server Ollama</td></tr>
+      <tr><td><code>OLLAMA_MODEL</code></td><td>qwen2:1.5b</td><td>Model Ollama yang digunakan</td></tr>
+      <tr><td><code>SYSTEM_PROMPT_FRIDAY</code></td><td>Persona JARVIS</td><td>Kepribadian dan instruksi untuk AI</td></tr>
+    </table>
+    <div class="highlight warn">
+      Semua variabel dapat di-override via environment variable (.env file) tanpa mengubah config.py. Contoh: <code>export GEMINI_API_KEY="key_baru"</code>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>PERSONA FRIDAY — KEPRIBADIAN AI</div>
+    <p>System prompt mendefinisikan kepribadian Friday sebagai AI ala JARVIS:</p>
+    <ul>
+      <li><strong>Gaya bicara:</strong> Santai, natural, campuran Indonesia-Inggris ("On it", "Noted", "Stand by")</li>
+      <li><strong>Panggilan:</strong> "Bos" atau "Bos Angga" — natural, tidak setiap kalimat</li>
+      <li><strong>Humor:</strong> Kering ala JARVIS — singkat dan cerdas</li>
+      <li><strong>Format:</strong> Maksimal 3 kalimat untuk pertanyaan biasa, lebih panjang hanya jika riset</li>
+      <li><strong>Larangan:</strong> Tidak boleh markdown (**, #, backtick), tidak sebut sumber/URL</li>
+      <li><strong>Wawasan:</strong> Teknologi, AI, gadget, politik global, ekonomi, film, musik, gaming</li>
+    </ul>
+    <div class="code-block"><span class="cmt">Contoh respons Friday:
+- "Sudah dieksekusi, Bos."
+- "On it. Kasih saya beberapa detik."
+- "Cuaca hari ini kurang bersahabat — saran saya bawa payung."
+- "Noted. Saya simpan di memori."
+- "Standby. Semua sistem hijau."</span></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ SECTION 7: INSTALASI -->
+<div class="page">
+  <div class="section-header">
+    <span class="section-num">07</span>
+    <span class="section-title">CARA INSTALASI DAN MENJALANKAN</span>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>PRASYARAT SISTEM</div>
+    <div class="grid-2">
+      <div>
+        <strong>Termux packages:</strong>
+        <div class="code-block">pkg update && pkg upgrade
+pkg install python python-pip
+pkg install termux-api
+pkg install mpv ffmpeg
+pkg install portaudio
+pkg install ollama    <span class="cmt"># untuk mode offline</span></div>
+      </div>
+      <div>
+        <strong>Python packages:</strong>
+        <div class="code-block">pip install google-generativeai
+pip install edge-tts
+pip install SpeechRecognition
+pip install requests colorama
+pip install ddgs gtts
+pip install python-dotenv
+pip install pyaudio</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>LANGKAH SETUP</div>
+    <ol>
+      <li>Clone repository: <code>git clone https://github.com/Bomballed/friday-v4</code></li>
+      <li>Masuk direktori: <code>cd friday-v4</code></li>
+      <li>Install dependencies: <code>pip install -r requirements.txt</code></li>
+      <li>Edit <code>config.py</code> — isi API keys Gemini, OpenWeatherMap, NewsAPI</li>
+      <li>Set nama di <code>NAMA_PENGGUNA = "NamaAnda"</code></li>
+      <li>Jalankan Friday: <code>python main.py</code></li>
+    </ol>
+    <div class="highlight">
+      <strong>Mode tanpa kamera:</strong> Set <code>KAMERA_WAJIB = false</code> di config.py. Friday berjalan dalam mode suara saja — aktifkan dengan "Hai Friday".
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>SETUP OLLAMA (MODE OFFLINE)</div>
+    <div class="code-block"><span class="cmt"># Install Ollama via Termux package manager</span>
+pkg install ollama
+
+<span class="cmt"># Jalankan Ollama server di background</span>
+ollama serve &
+
+<span class="cmt"># Download model qwen2:1.5b (~1GB)</span>
+ollama pull qwen2:1.5b
+
+<span class="cmt"># Friday otomatis switch ke Ollama saat internet mati</span></div>
+    <p>Internet check dilakukan setiap 20 detik via socket ke DNS Google (8.8.8.8:53). Jika gagal, Friday otomatis pakai Ollama. Jika Ollama juga tidak tersedia, Friday tetap menggunakan Gemini (mungkin gagal).</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>CARA MENGGUNAKAN FRIDAY</div>
+    <table>
+      <tr><th>Perintah</th><th>Aksi</th></tr>
+      <tr><td>"Hai Friday"</td><td>Aktifkan mode mendengarkan (wake word)</td></tr>
+      <tr><td>"Apa cuaca hari ini?"</td><td>Laporan cuaca dari OpenWeatherMap</td></tr>
+      <tr><td>"Buka Spotify"</td><td>Buka Spotify dan mulai play</td></tr>
+      <tr><td>"Buka WhatsApp"</td><td>Buka WhatsApp via Activity Manager</td></tr>
+      <tr><td>"Hitung 15% dari 850000"</td><td>Kalkulator lokal, tanpa AI</td></tr>
+      <tr><td>"Cari berita AI terbaru"</td><td>DuckDuckGo search + ringkasan Gemini</td></tr>
+      <tr><td>"Jelaskan quantum computing"</td><td>Riset mendalam 3-langkah</td></tr>
+      <tr><td>"Buka berita pertama"</td><td>Buka URL artikel berita #1 di Chrome</td></tr>
+      <tr><td>"Apa yang kamu lihat?"</td><td>Analisis gambar kamera via Gemini Vision</td></tr>
+      <tr><td>"Ingat bahwa saya suka kopi hitam"</td><td>Simpan ke memori permanen SQLite</td></tr>
+      <tr><td>"Reset sesi"</td><td>Hapus history percakapan Gemini</td></tr>
+      <tr><td>"Statistik"</td><td>Tampilkan statistik interaksi hari ini</td></tr>
+      <tr><td>"Matikan Friday"</td><td>Keluar dari program</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ SECTION 8: TROUBLESHOOTING -->
+<div class="page">
+  <div class="section-header">
+    <span class="section-num">08</span>
+    <span class="section-title">TROUBLESHOOTING &amp; CATATAN TEKNIS</span>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>MASALAH UMUM DAN SOLUSI</div>
+    <table>
+      <tr><th>Masalah</th><th>Penyebab</th><th>Solusi</th></tr>
+      <tr>
+        <td>mpv tidak memutar suara</td>
+        <td>Android memerlukan audio output driver khusus</td>
+        <td>Sudah diperbaiki: <code>--ao=opensles</code> ditambahkan ke flag mpv. Fallback ke <code>--ao=android</code> jika opensles tidak tersedia.</td>
+      </tr>
+      <tr>
+        <td>Streaming tidak terlihat, jawaban muncul sekaligus</td>
+        <td><code>bicara()</code> memanggil <code>tampilkan_friday_bicara()</code> yang print ulang setelah streaming selesai</td>
+        <td>Sudah diperbaiki: flag <code>_ss["sudah_tampil"]</code> mencegah double display.</td>
+      </tr>
+      <tr>
+        <td>Spotify tidak play meski terminal menunjukkan "membuka"</td>
+        <td>Syntax <code>am start pkg</code> salah; keyevent 85 adalah toggle bukan PLAY</td>
+        <td>Sudah diperbaiki: syntax <code>am start -a ... -p pkg</code> yang benar; PLAY menggunakan keyevent 126.</td>
+      </tr>
+      <tr>
+        <td>Gemini error "thinking not supported"</td>
+        <td>Versi SDK lama tidak mendukung thinking config</td>
+        <td>Auto-reinisialisasi model tanpa thinking config.</td>
+      </tr>
+      <tr>
+        <td>Edge-TTS tidak bisa dijalankan</td>
+        <td>Konflik asyncio event loop</td>
+        <td>Edge-TTS dijalankan di thread terpisah dengan event loop baru.</td>
+      </tr>
+      <tr>
+        <td>"git restore config.py" error: path is unmerged</td>
+        <td>File dalam status merge conflict</td>
+        <td>Gunakan <code>git checkout --ours config.py</code> → <code>git add</code> → <code>git stash drop</code>.</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>CATATAN ANDROID/TERMUX</div>
+      <ul>
+        <li>mpv di Android membutuhkan <code>--ao=opensles</code> untuk output audio</li>
+        <li><code>am start</code> butuh syntax lengkap dengan <code>-a</code>, <code>-c</code>, <code>-p</code></li>
+        <li>Termux:API harus terinstall untuk <code>termux-media-player</code></li>
+        <li>Port audio (pyaudio) perlu portaudio: <code>pkg install portaudio</code></li>
+        <li>IP Webcam: install di Android, start server, salin URL ke config</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>OPTIMASI PERFORMA</div>
+      <ul>
+        <li>Internet check dicache 20 detik agar tidak delay tiap request</li>
+        <li>Berita dicache 30 menit via PeriodicRefresh thread</li>
+        <li>History Gemini dibatasi 20 pesan terakhir</li>
+        <li>History Ollama dibatasi 20 pesan, berita dibatasi 3 item</li>
+        <li>Skill berjalan lokal — 0ms latency, tidak butuh internet</li>
+        <li>Spinner animasi di thread terpisah — tidak block main loop</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card" style="border-color: rgba(0,230,118,0.3);">
+    <div class="card-title"><span class="dot" style="background:var(--green); box-shadow: 0 0 8px var(--green);"></span>RENCANA PENGEMBANGAN SELANJUTNYA</div>
+    <div class="grid-2">
+      <ul>
+        <li>Integrasi Google Calendar untuk pengingat jadwal</li>
+        <li>Smart home control via MQTT/Zigbee</li>
+        <li>Pengenalan wajah untuk auto-sapaan personal</li>
+        <li>Mode multi-bahasa (otomatis deteksi bahasa)</li>
+      </ul>
+      <ul>
+        <li>Plugin sistem untuk skill custom tambahan</li>
+        <li>Dashboard mobile-responsive yang lebih kaya</li>
+        <li>Integrasi Spotify Web API untuk info lagu</li>
+        <li>Notifikasi push ke perangkat lain via ntfy/Pushover</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div style="text-align:center; padding: 30px 0; opacity: 0.6;">
+    <div style="font-family:'Orbitron',sans-serif; font-size:24px; letter-spacing:8px; color:var(--cyan);">FRIDAY v4.0</div>
+    <div style="font-family:'Share Tech Mono',monospace; font-size:11px; letter-spacing:3px; margin-top:8px; color:var(--text);">
+      PERSONAL AI ASSISTANT  ·  POWERED BY GEMINI 2.5 FLASH  ·  BY ANGGA
+    </div>
+    <div style="font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:2px; margin-top:6px; opacity:0.5;">
+      "Standing by, Boss. All systems green."
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
