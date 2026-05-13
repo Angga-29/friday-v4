@@ -26,6 +26,7 @@
 
 import time
 import sys
+import socket
 import threading
 
 import config
@@ -50,6 +51,7 @@ from modules.penglihatan import perlu_penglihatan, deskripsikan_pemandangan
 from modules.proaktif    import ModeProaktif
 from modules.riset       import perlu_riset, riset_mendalam
 from modules.dashboard   import buka_dashboard, refresh_dashboard, update_data as dashboard_update, tutup_dashboard, set_stop_callback
+from modules.lokal_ai   import LokalAI
 from skills              import SkillManager
 
 # Import modul kamera & wajah — opsional (tidak crash jika tidak tersedia)
@@ -92,15 +94,46 @@ COOLDOWN_GERAK    = 30
 state = {
     "wake_triggered"  : False,
     "ai"              : None,
+    "lokal_ai"        : None,   # Ollama — aktif saat offline
     "memori"          : None,
     "skill_manager"   : None,
-    "status_sistem"   : "Standby",   # status real-time untuk dashboard
+    "status_sistem"   : "Standby",
     "frame_terakhir"  : None,
     "cache_waktu"     : "",
     "cache_cuaca"     : "",
     "cache_berita"    : [],
-    "tanpa_kamera"    : False,   # True = mode suara saja
+    "tanpa_kamera"    : False,
 }
+
+# Cache hasil cek internet — agar tidak cek setiap request
+_internet_cache = {"ok": True, "ts": 0.0}
+
+def _cek_internet() -> bool:
+    """Cek koneksi internet via socket ke DNS Google. Cache 20 detik."""
+    now = time.time()
+    if now - _internet_cache["ts"] < 20:
+        return _internet_cache["ok"]
+    try:
+        sock = socket.create_connection(("8.8.8.8", 53), timeout=2)
+        sock.close()
+        _internet_cache["ok"] = True
+    except OSError:
+        _internet_cache["ok"] = False
+    _internet_cache["ts"] = now
+    return _internet_cache["ok"]
+
+
+def _pilih_ai():
+    """
+    Return AI yang dipakai untuk sesi ini.
+    Urutan: Gemini (online) → Ollama (offline) → Gemini anyway (no choice)
+    """
+    if _cek_internet():
+        return state["ai"], False   # (ai_object, is_offline)
+    lokal = state["lokal_ai"]
+    if lokal and lokal.terhubung:
+        return lokal, True
+    return state["ai"], False
 
 
 # ==============================================================
@@ -199,7 +232,15 @@ def inisialisasi_semua():
         sys.exit(1)
     state["ai"] = ai
 
-    # 5. Skills System (OpenJarvis-inspired)
+    # 5. Ollama Local AI (opsional — hanya aktif jika Ollama jalan)
+    lokal_ai = LokalAI(
+        host=config.OLLAMA_HOST,
+        model=config.OLLAMA_MODEL,
+        system_prompt=config.SYSTEM_PROMPT_FRIDAY,
+    )
+    state["lokal_ai"] = lokal_ai
+
+    # 6. Skills System (OpenJarvis-inspired)
     skill_manager = SkillManager()
     state["skill_manager"] = skill_manager
     daftar = skill_manager.daftar_skill()
@@ -316,9 +357,12 @@ def proses_jawaban(suara_user, ai, memori, skill_manager):
 
         # ── 6. RISET MENDALAM ────────────────────────────────────────
         if perlu_riset(suara_user):
+            if not _cek_internet():
+                bicara("Riset butuh koneksi internet, Bos. Saya sedang offline.")
+                return False
             set_status("Riset")
             tampilkan_status("Mode riset mendalam aktif.", "browsing")
-            bicara("Baik, saya akan melakukan riset mendalam. Mohon tunggu sebentar.")
+            bicara("On it. Lakukan riset mendalam, mohon tunggu sebentar.")
             jawaban = riset_mendalam(suara_user, ai)
             bicara(jawaban)
             memori.simpan_percakapan(suara_user, jawaban, pakai_web=True, tipe="riset")
@@ -338,6 +382,9 @@ def proses_jawaban(suara_user, ai, memori, skill_manager):
 
         # ── 8. BROWSING ──────────────────────────────────────────────
         if perlu_browsing(suara_user):
+            if not _cek_internet():
+                bicara("Browsing butuh internet, Bos. Koneksi sedang tidak tersedia.")
+                return False
             set_status("Browsing")
             tampilkan_status("Pertanyaan perlu browsing.", "browsing")
             bicara("Baik, saya carikan dari internet.")
@@ -354,17 +401,24 @@ def proses_jawaban(suara_user, ai, memori, skill_manager):
             memori.catat_interaksi("browsing")
             return False
 
-        # ── 9. GEMINI CHAT — streaming response ──────────────────────
-        perintah = ai.bangun_konteks(
+        # ── 9. CHAT — Gemini (online) atau Ollama (offline) ──────────
+        ai_aktif, mode_offline = _pilih_ai()
+
+        if mode_offline:
+            tampilkan_status(
+                f"OFFLINE MODE — menggunakan {config.OLLAMA_MODEL} lokal.", "peringatan"
+            )
+
+        perintah = ai_aktif.bangun_konteks(
             suara_user=suara_user, waktu=cache_waktu,
             cuaca=cache_cuaca, berita=cache_berita
         )
 
-        # Tampilkan jawaban kata-per-kata saat Gemini generate
+        # Streaming: tampil kata per kata di terminal, TTS setelah selesai
         mulai_bubble_stream()
         teks_lengkap = ""
         try:
-            for chunk in ai.tanya_stream(perintah):
+            for chunk in ai_aktif.tanya_stream(perintah):
                 stream_chunk(chunk)
                 teks_lengkap += chunk
         finally:
@@ -372,7 +426,10 @@ def proses_jawaban(suara_user, ai, memori, skill_manager):
 
         jawaban = teks_lengkap.strip() or "Maaf, tidak ada jawaban dari AI."
         bicara(jawaban)
-        memori.simpan_percakapan(suara_user, jawaban, tipe="chat")
+        memori.simpan_percakapan(
+            suara_user, jawaban,
+            tipe="chat_offline" if mode_offline else "chat"
+        )
         memori.catat_interaksi("interaksi")
         return False
 
