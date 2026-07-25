@@ -166,10 +166,17 @@ def _generate_html() -> str:
         else:
             animasi_tag = ""
 
+        # Ring animasi ala JARVIS (berputar + glow berdenyut) dibungkus
+        # DI BELAKANG logo custom — logo & tulisannya tetap tegak/jelas,
+        # tidak ikut berputar seperti gambar aslinya.
         logo_html = (
             '<div class="reactor-wrap">'
-            f'  <img id="logoStatic" src="/assets/{logo_file}" class="logo-custom" alt="Friday">'
-            f'  {animasi_tag}'
+            '  <div class="hud-wrap">'
+            '    <div class="hud-ring hud-ring-out"></div>'
+            '    <div class="hud-ring hud-ring-in"></div>'
+            f'    <img id="logoStatic" src="/assets/{logo_file}" class="logo-custom" alt="Friday">'
+            f'    {animasi_tag}'
+            '  </div>'
             '</div>'
         )
     else:
@@ -213,7 +220,27 @@ body::after{{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 
 /* ── Arc Reactor ── */
 .reactor-wrap{{display:flex;justify-content:center;margin:10px 0 14px;}}
-.logo-custom{{max-width:140px;max-height:140px;width:auto;height:auto;object-fit:contain;filter:drop-shadow(0 0 18px rgba(0,229,255,0.5));}}
+
+/* ── HUD wrap: bungkus logo custom dengan ring animasi ala JARVIS ── */
+.hud-wrap{{position:relative;width:150px;height:150px;display:flex;align-items:center;justify-content:center;}}
+.logo-custom{{position:relative;z-index:2;max-width:120px;max-height:120px;width:auto;height:auto;object-fit:contain;
+  filter:drop-shadow(0 0 10px rgba(255,140,0,0.55));
+  animation:hud-pulse 2.4s ease-in-out infinite;}}
+.hud-ring{{position:absolute;border-radius:50%;z-index:1;}}
+.hud-ring-out{{inset:0;border:2px dashed rgba(255,140,0,0.55);
+  animation:hud-spin 10s linear infinite;}}
+.hud-ring-in{{inset:16px;border:2px solid transparent;border-top-color:rgba(0,229,255,0.6);
+  border-right-color:rgba(0,229,255,0.6);
+  animation:hud-spin 4s linear infinite reverse;}}
+@keyframes hud-spin{{to{{transform:rotate(360deg);}}}}
+@keyframes hud-pulse{{
+  0%,100%{{filter:drop-shadow(0 0 10px rgba(255,140,0,0.55));transform:scale(1);}}
+  50%{{filter:drop-shadow(0 0 20px rgba(255,140,0,0.85));transform:scale(1.03);}}
+}}
+/* Saat Friday aktif (bukan Standby) — ring berputar lebih cepat & glow lebih kuat */
+.hud-wrap.aktif .hud-ring-out{{animation-duration:3s;border-color:rgba(255,140,0,0.9);}}
+.hud-wrap.aktif .hud-ring-in{{animation-duration:1.3s;}}
+.hud-wrap.aktif .logo-custom{{animation-duration:0.9s;}}
 .reactor{{position:relative;width:88px;height:88px;}}
 .ring{{position:absolute;border-radius:50%;border:2px solid transparent;}}
 .r1{{inset:0;border-color:#00e5ff;animation:spin1 6s linear infinite;box-shadow:0 0 12px #00e5ff;}}
@@ -422,16 +449,19 @@ function pollStatus(){{
     if(btn)btn.style.display=d.status==='Berbicara'?'flex':'none';
 
     // Logo custom: tampilkan animasi selama Friday aktif, logo statis saat Standby
+    const aktif = d.status !== 'Standby';
     const logoStatic=document.getElementById('logoStatic');
     const logoAnim=document.getElementById('logoAnim');
     if(logoStatic && logoAnim){{
-      const aktif = d.status !== 'Standby';
       logoAnim.style.display   = aktif ? 'block' : 'none';
       logoStatic.style.display = aktif ? 'none'  : 'block';
       if(aktif && logoAnim.tagName==='VIDEO' && logoAnim.paused){{
         logoAnim.play().catch(()=>{{}});
       }}
     }}
+    // Ring HUD ala JARVIS: berputar lebih cepat + glow lebih kuat saat aktif
+    const hudWrap=document.querySelector('.hud-wrap');
+    if(hudWrap) hudWrap.classList.toggle('aktif', aktif);
   }}).catch(()=>{{}});
 }}
 setInterval(pollStatus,4000);
