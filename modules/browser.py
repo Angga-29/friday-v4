@@ -134,16 +134,16 @@ def cari_web(query: str) -> list[dict]:
     return []
 
 
-def format_untuk_gemini(query: str, hasil: list[dict]) -> str:
+def format_untuk_ai(query: str, hasil: list[dict]) -> str:
     """
-    Memformat hasil pencarian web menjadi konteks yang siap dikirim ke Gemini.
+    Memformat hasil pencarian web menjadi konteks yang siap dikirim ke AI.
 
     Args:
         query  : Pertanyaan asli pengguna.
         hasil  : List hasil pencarian dari cari_web().
 
     Returns:
-        String konteks terformat untuk Gemini.
+        String konteks terformat untuk AI.
     """
     if not hasil:
         return (

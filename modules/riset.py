@@ -4,14 +4,14 @@
 # ==============================================================
 """
 Riset mendalam = 3 pencarian dengan sudut pandang berbeda,
-lalu disintesis oleh Gemini menjadi jawaban komprehensif.
+lalu disintesis oleh AI (Claude) menjadi jawaban komprehensif.
 
 Berbeda dari browsing biasa:
   Browsing  → 1 pencarian → jawab langsung
   Riset     → 3 pencarian → deduplikasi → sintesis mendalam
 """
 
-from modules.browser import cari_web, format_untuk_gemini
+from modules.browser import cari_web, format_untuk_ai
 from modules.tampilan import tampilkan_status
 
 TRIGGER_WORDS = [
@@ -42,7 +42,7 @@ def riset_mendalam(teks_asli: str, ai) -> str:
       1. Pencarian topik utama
       2. Pencarian detail/penjelasan lengkap
       3. Pencarian perkembangan terbaru
-      → Deduplikasi → Sintesis via Gemini
+      → Deduplikasi → Sintesis via AI
     """
     topik = _ekstrak_topik(teks_asli)
     tampilkan_status(f"Riset mendalam: '{topik}'", "browsing")
@@ -71,7 +71,7 @@ def riset_mendalam(teks_asli: str, ai) -> str:
 
     tampilkan_status(f"{len(unik)} sumber unik ditemukan. Mensintesis...", "sukses")
 
-    konteks = format_untuk_gemini(topik, unik[:9])
+    konteks = format_untuk_ai(topik, unik[:9])
     prompt = (
         f"{konteks}\n\n"
         f"[INSTRUKSI RISET MENDALAM]\n"

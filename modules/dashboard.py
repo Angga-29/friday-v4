@@ -13,7 +13,7 @@ Cara kerja:
 import os
 import html as _html_lib
 import threading
-import subprocess
+import webbrowser
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
@@ -269,7 +269,7 @@ body::after{{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 
   <!-- Ticker -->
   <div class="ticker-wrap">
-    <span class="ticker">◈ FRIDAY AI AKTIF &nbsp;&nbsp; ◈ GEMINI 2.5 FLASH &nbsp;&nbsp; ◈ EDGE-TTS PREMIUM &nbsp;&nbsp; ◈ SISTEM NORMAL &nbsp;&nbsp; ◈ SELAMAT DATANG BOS {nama.upper()} &nbsp;&nbsp; ◈ {updated} &nbsp;&nbsp;</span>
+    <span class="ticker">◈ FRIDAY AI AKTIF &nbsp;&nbsp; ◈ CLAUDE AI &nbsp;&nbsp; ◈ EDGE-TTS PREMIUM &nbsp;&nbsp; ◈ SISTEM NORMAL &nbsp;&nbsp; ◈ SELAMAT DATANG BOS {nama.upper()} &nbsp;&nbsp; ◈ {updated} &nbsp;&nbsp;</span>
   </div>
 
   <!-- Grid: Jam + Radar -->
@@ -307,7 +307,7 @@ body::after{{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   <!-- Sistem -->
   <div class="card" style="margin-bottom:10px;">
     <div class="ctitle">⬡ STATUS SISTEM</div>
-    <div class="sys-row"><span class="sn">Gemini AI 2.5</span><span class="son">ONLINE</span></div>
+    <div class="sys-row"><span class="sn">Claude AI</span><span class="son">ONLINE</span></div>
     <div class="sys-row"><span class="sn">Wake Word</span><span class="son">AKTIF</span></div>
     <div class="sys-row"><span class="sn">Kamera Vision</span><span class="son">ONLINE</span></div>
     <div class="sys-row"><span class="sn">Browsing Net</span><span class="son">AKTIF</span></div>
@@ -497,7 +497,7 @@ def _start_server():
 
 
 def buka_dashboard():
-    """Start HTTP server lalu buka http://localhost:PORT di Chrome."""
+    """Start HTTP server lalu buka http://localhost:PORT di browser default."""
     _start_server()
 
     import time
@@ -505,28 +505,11 @@ def buka_dashboard():
 
     url = f"http://localhost:{PORT}"
 
-    cmds = [
-        # Chrome — package name yang umum di Android
-        ["am", "start", "-a", "android.intent.action.VIEW",
-         "-d", url, "-p", "com.android.chrome"],
-        ["am", "start", "-a", "android.intent.action.VIEW",
-         "-d", url, "-p", "com.google.android.apps.chrome"],
-        # Browser default via termux-open-url
-        ["termux-open-url", url],
-        # xdg-open fallback
-        ["xdg-open", url],
-    ]
-
-    for cmd in cmds:
-        try:
-            subprocess.Popen(cmd,
-                             stdout=subprocess.DEVNULL,
-                             stderr=subprocess.DEVNULL)
-            return True
-        except FileNotFoundError:
-            continue
-
-    return False
+    try:
+        webbrowser.open(url)
+        return True
+    except Exception:
+        return False
 
 
 def refresh_dashboard(waktu="", cuaca="", cuaca_data=None,
@@ -537,11 +520,10 @@ def refresh_dashboard(waktu="", cuaca="", cuaca_data=None,
 
 
 def tutup_dashboard():
-    """Tutup Chrome dan hentikan HTTP server saat Friday dimatikan."""
-    # Tutup Chrome (coba kedua package name)
-    for pkg in ("com.android.chrome", "com.google.android.apps.chrome"):
-        try:
-            subprocess.run(["am", "force-stop", pkg],
-                           capture_output=True, timeout=5)
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            pass
+    """
+    Dipanggil saat Friday dimatikan. Tab dashboard di browser SENGAJA
+    tidak ditutup paksa — di Windows itu berarti mematikan seluruh
+    jendela/tab browser milik user, bukan cuma dashboard. HTTP server
+    berhenti sendiri karena berjalan di daemon thread.
+    """
+    pass

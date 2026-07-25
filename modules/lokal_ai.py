@@ -3,19 +3,18 @@
 # Versi : 1.0.0 — Fallback offline via Ollama REST API
 # ==============================================================
 """
-Dipakai saat Gemini tidak bisa diakses (offline / quota habis).
+Dipakai saat Claude tidak bisa diakses (offline / quota habis).
 Menghubungi Ollama server lokal di port 11434.
 
-Model yang direkomendasikan untuk Xiaomi Pad 7 (ARM64, 8–12 GB RAM):
-  qwen2:1.5b    — ~1 GB, bahasa Indonesia cukup baik, cepat
-  tinyllama     — ~600 MB, paling ringan, terbatas
-  phi3:mini     — ~2.3 GB, lebih pintar tapi lebih lambat
+Model yang direkomendasikan untuk desktop dengan GPU (mis. RTX 5050, ~8GB VRAM):
+  qwen2.5:7b    — ~4.7 GB (Q4), bahasa Indonesia bagus, seimbang (default)
+  llama3.1:8b   — ~4.9 GB (Q4), alternatif kuat, konteks panjang
+  mistral:7b    — ~4.1 GB (Q4), cepat, cocok untuk VRAM lebih terbatas
 
-Install Ollama di Termux:
-  curl -L https://ollama.com/download/ollama-linux-arm64 -o ~/ollama
-  chmod +x ~/ollama
-  ~/ollama serve &          ← jalankan server (background)
-  ~/ollama pull qwen2:1.5b  ← download model (~1 GB)
+Install Ollama di Windows:
+  Download installer dari https://ollama.com/download/windows
+  ollama serve             ← jalankan server (biasanya auto-start sebagai service)
+  ollama pull qwen2.5:7b   ← download model (~4.7 GB)
 
 Setelah itu Friday otomatis pakai Ollama saat offline.
 """
@@ -31,7 +30,7 @@ TIMEOUT_GENERATE = 180  # detik — tunggu response (model lokal lambat)
 
 class LokalAI:
     """
-    Wrapper Ollama dengan interface sama seperti GeminiAI:
+    Wrapper Ollama dengan interface sama seperti ClaudeAI:
       - tanya(perintah)        → str
       - tanya_stream(perintah) → generator[str]
       - bangun_konteks(...)    → str
@@ -72,7 +71,7 @@ class LokalAI:
                 else:
                     tampilkan_status(
                         f"Ollama jalan tapi model '{self.model}' belum di-pull.\n"
-                        f"Jalankan: ~/ollama pull {self.model}",
+                        f"Jalankan: ollama pull {self.model}",
                         "peringatan"
                     )
         except Exception as e:
@@ -205,7 +204,7 @@ class LokalAI:
                 self._simpan_history(perintah, teks_penuh)
 
     # ----------------------------------------------------------
-    # BANGUN KONTEKS — sama dengan GeminiAI
+    # BANGUN KONTEKS — sama dengan ClaudeAI
     # ----------------------------------------------------------
     def bangun_konteks(self, suara_user: str, waktu: str,
                        cuaca: str, berita: list) -> str:

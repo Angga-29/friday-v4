@@ -22,18 +22,19 @@ try:
 except ImportError:
     pass
 
-# --- KAMERA (IP Webcam) ---
-# Buka aplikasi IPWebcam di Android → Start server → salin URL yang muncul
-# Jika tidak punya IP Webcam, biarkan default dan set KAMERA_WAJIB = False
-URL_KAMERA = os.getenv("CAMERA_URL", "http://192.168.x.x:8080/shot.jpg")
+# --- KAMERA (USB Webcam — mis. eMeet C960) ---
+# Index device webcam (biasanya 0 jika hanya ada 1 kamera terpasang).
+# Kalau tidak yakin index yang benar, jalankan:
+#   python -c "from modules.kamera import daftar_kamera_tersedia; daftar_kamera_tersedia()"
+CAMERA_INDEX = int(os.getenv("CAMERA_INDEX", "0"))
 
 # False = Friday tetap jalan walau kamera gagal (mode suara saja)
 # True  = Friday berhenti jika kamera tidak tersambung
 KAMERA_WAJIB = os.getenv("KAMERA_WAJIB", "false").lower() == "true"
 
 # --- API KEYS ---
-# Google Gemini  → https://aistudio.google.com/app/apikey (GRATIS)
-API_KEY_GEMINI = os.getenv("GEMINI_API_KEY", "MASUKKAN_GEMINI_API_KEY_DISINI")
+# Claude (Anthropic) → https://console.anthropic.com/settings/keys
+API_KEY_CLAUDE = os.getenv("ANTHROPIC_API_KEY", "MASUKKAN_ANTHROPIC_API_KEY_DISINI")
 
 # OpenWeatherMap → https://openweathermap.org/api (GRATIS tier tersedia)
 API_KEY_CUACA = os.getenv("WEATHER_API_KEY", "MASUKKAN_OPENWEATHER_API_KEY_DISINI")
@@ -49,11 +50,11 @@ NAMA_PENGGUNA = os.getenv("USER_NAME", "NamaMu")
 KOTA_CUACA = os.getenv("WEATHER_CITY", "Jakarta,ID")
 
 # --- OLLAMA (Local AI — fallback saat offline) ---
-# Install di Termux: pkg install ollama
-# Jalankan server: ollama serve &
-# Download model: ollama pull qwen2:1.5b
+# Install di Windows: https://ollama.com/download/windows
+# Jalankan server: ollama serve
+# Download model: ollama pull qwen2.5:7b
 OLLAMA_HOST  = os.getenv("OLLAMA_HOST",  "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2:1.5b")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
 
 # --- PERSONA FRIDAY ---
 SYSTEM_PROMPT_FRIDAY = f"""

@@ -1,27 +1,36 @@
 # ==============================================================
-# requirements.txt — Project Friday v4.0.0
-# Platform: Termux (Android) + IP Webcam + Xiaomi Pad 7
-#
-# PENTING untuk Termux — install OpenCV via pkg, BUKAN pip:
-#   pkg install python-opencv
-#   (pip install opencv-contrib-python GAGAL di Android ARM)
+# requirements.txt — Project Friday v5.0.0
+# Platform: Windows Desktop (ASUS TUF) + USB Webcam (eMeet C960)
 # ==============================================================
 
 # HTTP & API
 requests>=2.31.0
 
-# Google Gemini AI + Vision
-google-generativeai>=0.8.0
+# Claude (Anthropic) AI + Vision — otak utama
+anthropic>=0.40.0
 
 # Suara — Edge-TTS Premium (suara Microsoft Neural, gratis, online)
 edge-tts>=6.1.0
 
+# Suara — Fallback offline native Windows (SAPI5)
+pyttsx3>=2.90
+
 # Suara — Fallback Google TTS
 gTTS>=2.4.0
 
-# Speech Recognition (butuh: pkg install flac portaudio)
+# Speech Recognition
+# (SpeechRecognition sudah membundel flac-win32.exe untuk Windows,
+#  jadi tidak perlu install flac terpisah seperti di Termux)
 SpeechRecognition>=3.10.0
 PyAudio>=0.2.13
+
+# Computer Vision — webcam USB, deteksi & pengenalan wajah (LBPH)
+# CATATAN: pakai HANYA opencv-contrib-python (bukan opencv-python juga) —
+# keduanya sama-sama menyediakan modul 'cv2' dan akan saling menimpa jika
+# diinstall berbarengan. opencv-contrib-python sudah mencakup semua fitur
+# opencv-python DITAMBAH cv2.face (LBPH) untuk pengenalan wajah personal.
+opencv-contrib-python>=4.9.0
+numpy>=1.26.0
 
 # Browsing Internet
 ddgs>=0.6.0
@@ -33,16 +42,18 @@ colorama>=0.4.6
 python-dotenv>=1.0.0
 
 # ==============================================================
-# CATATAN TERMUX — Install manual (tidak bisa via pip):
+# CATATAN INSTALASI WINDOWS:
 #
-#   pkg install python-opencv   ← OpenCV (termasuk cv2)
-#   pkg install flac            ← Wajib untuk SpeechRecognition
-#   pkg install portaudio       ← Wajib untuk PyAudio
-#   pkg install mpv             ← Audio player utama
-#   pkg install ffmpeg          ← Audio player fallback
-#   pkg install termux-api      ← Untuk mikrofon Termux
+#   pip install -r requirements.txt
 #
-# Pengenalan wajah (opsional — opencv-contrib):
-#   Tidak tersedia di Termux. Friday berjalan tanpa pengenalan
-#   wajah tapi deteksi wajah (haar cascade) tetap aktif.
+#   Jika PyAudio gagal build dari source, pakai wheel precompiled:
+#     pip install pipwin && pipwin install pyaudio
+#
+#   Audio player (wajib, tidak lewat pip):
+#     mpv    → https://mpv.io/installation/  (atau: winget install mpv)
+#     ffmpeg → https://ffmpeg.org/download.html (fallback ffplay)
+#
+#   Ollama (fallback offline, opsional):
+#     https://ollama.com/download/windows
+#     ollama pull qwen2.5:7b
 # ==============================================================

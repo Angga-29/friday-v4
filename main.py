@@ -9,12 +9,17 @@
 #   ╚═╝     ╚═╝  ╚═╝╚═╝╚═════╝ ╚═╝  ╚═╝   ╚═╝
 #
 #   Project Friday — AI Personal Assistant
-#   Versi    : 4.0.0 — Powered by OpenJarvis Concepts
-#   Platform : Termux (Android) + IP Webcam + Xiaomi Pad 7
+#   Versi    : 5.0.0 — Powered by OpenJarvis Concepts
+#   Platform : Windows Desktop (ASUS TUF) + USB Webcam (eMeet C960)
 #   Author   : Angga
-#   Engine   : Gemini 2.5 Flash + Skills + Deep Research + Vision
+#   Engine   : Claude (Anthropic) + Skills + Deep Research + Vision
 #
-#   FITUR BARU v4.0 (terinspirasi OpenJarvis):
+#   FITUR BARU v5.0:
+#   ✓ Otak utama Claude (Anthropic) — sebelumnya Gemini
+#   ✓ Kamera USB lokal (eMeet C960) — sebelumnya IP Webcam Android
+#   ✓ Berjalan native di Windows — sebelumnya Termux/Android
+#
+#   FITUR v4.0 (terinspirasi OpenJarvis):
 #   ✓ Skills System — eksekusi lokal sebelum Gemini
 #   ✓ Deep Research — riset 3-langkah multi-sumber
 #   ✓ Morning Digest — ringkasan pagi otomatis
@@ -43,8 +48,8 @@ from modules.tepuk       import DetektorTepuk
 from modules.info        import dapatkan_waktu, dapatkan_cuaca, dapatkan_cuaca_data, dapatkan_berita
 
 INTERVAL_REFRESH_DATA = 1800   # detik — refresh cuaca+berita otomatis setiap 30 menit
-from modules.gemini_ai   import GeminiAI
-from modules.browser     import perlu_browsing, cari_web, format_untuk_gemini
+from modules.claude_ai   import ClaudeAI
+from modules.browser     import perlu_browsing, cari_web, format_untuk_ai
 from modules.memori      import MemoriFriday
 from modules.wake_word   import WakeWordDetector
 from modules.penglihatan import perlu_penglihatan, deskripsikan_pemandangan
@@ -56,7 +61,7 @@ from skills              import SkillManager
 
 # Import modul kamera & wajah — opsional (tidak crash jika tidak tersedia)
 try:
-    from modules.kamera import ambil_frame, inisialisasi_kamera, ke_grayscale_blur
+    from modules.kamera import ambil_frame, inisialisasi_kamera, ke_grayscale_blur, lepas_kamera
     _KAMERA_TERSEDIA = True
 except ImportError as _e:
     tampilkan_status = None  # akan di-set ulang setelah import tampilkan
@@ -99,6 +104,7 @@ state = {
     "skill_manager"   : None,
     "status_sistem"   : "Standby",
     "frame_terakhir"  : None,
+    "kamera_cap"      : None,   # cv2.VideoCapture webcam USB
     "cache_waktu"     : "",
     "cache_cuaca"     : "",
     "cache_berita"    : [],
@@ -126,7 +132,7 @@ def _cek_internet() -> bool:
 def _pilih_ai():
     """
     Return AI yang dipakai untuk sesi ini.
-    Urutan: Gemini (online) → Ollama (offline) → Gemini anyway (no choice)
+    Urutan: Claude (online) → Ollama (offline) → Claude anyway (no choice)
     """
     if _cek_internet():
         return state["ai"], False   # (ai_object, is_offline)
@@ -193,12 +199,13 @@ def inisialisasi_semua():
             f"Modul kamera tidak dapat dimuat: {_KAMERA_IMPORT_ERROR if not _KAMERA_TERSEDIA else ''}",
             "peringatan"
         )
-        tampilkan_status("Pastikan OpenCV terinstall: pkg install python-opencv", "info")
+        tampilkan_status("Pastikan OpenCV terinstall: pip install opencv-python", "info")
         if kamera_wajib:
             sys.exit(1)
         state["tanpa_kamera"] = True
     else:
-        frame_awal = inisialisasi_kamera(config.URL_KAMERA)
+        cap, frame_awal = inisialisasi_kamera(config.CAMERA_INDEX)
+        state["kamera_cap"] = cap
         if frame_awal is None:
             if kamera_wajib:
                 tampilkan_status(
@@ -222,9 +229,9 @@ def inisialisasi_semua():
     elif not _WAJAH_TERSEDIA:
         tampilkan_status("Modul wajah tidak tersedia (install opencv-contrib).", "peringatan")
 
-    # 4. Gemini AI dengan memori
-    ai = GeminiAI(
-        api_key=config.API_KEY_GEMINI,
+    # 4. Claude AI dengan memori
+    ai = ClaudeAI(
+        api_key=config.API_KEY_CLAUDE,
         system_prompt=config.SYSTEM_PROMPT_FRIDAY,
         memori=memori
     )
@@ -342,7 +349,7 @@ def proses_jawaban(suara_user, ai, memori, skill_manager):
             bicara(f"Saya catat: {info}")
             return False
 
-        # ── 5. SKILLS (lokal — lebih cepat dari Gemini) ──────────────
+        # ── 5. SKILLS (lokal — lebih cepat dari Claude) ──────────────
         hasil_skill = skill_manager.cari_dan_jalankan(
             suara_user,
             callback_bicara=bicara,
@@ -374,7 +381,7 @@ def proses_jawaban(suara_user, ai, memori, skill_manager):
             set_status("Vision")
             tampilkan_vision()
             jawaban = deskripsikan_pemandangan(
-                state["frame_terakhir"], suara_user, config.API_KEY_GEMINI
+                state["frame_terakhir"], suara_user, config.API_KEY_CLAUDE
             )
             bicara(jawaban)
             memori.simpan_percakapan(suara_user, jawaban, pakai_web=False, tipe="vision")
@@ -390,7 +397,7 @@ def proses_jawaban(suara_user, ai, memori, skill_manager):
             bicara("Baik, saya carikan dari internet.")
             tampilkan_browsing(suara_user)
             hasil_web    = cari_web(suara_user)
-            konteks_web  = format_untuk_gemini(suara_user, hasil_web)
+            konteks_web  = format_untuk_ai(suara_user, hasil_web)
             konteks_penuh = (
                 f"[KONTEKS]\nWaktu: {cache_waktu}\nCuaca: {cache_cuaca}\n\n"
                 + konteks_web
@@ -401,7 +408,7 @@ def proses_jawaban(suara_user, ai, memori, skill_manager):
             memori.catat_interaksi("browsing")
             return False
 
-        # ── 9. CHAT — Gemini (online) atau Ollama (offline) ──────────
+        # ── 9. CHAT — Claude (online) atau Ollama (offline) ──────────
         ai_aktif, mode_offline = _pilih_ai()
 
         if mode_offline:
@@ -515,7 +522,7 @@ def jalankan():
             while True:
 
                 # ── 1. AMBIL FRAME ───────────────────────────────────
-                frame = ambil_frame(config.URL_KAMERA)
+                frame = ambil_frame(state["kamera_cap"])
                 if frame is None:
                     time.sleep(1)
                     continue
@@ -624,6 +631,8 @@ def jalankan():
         clap_detector.hentikan()
         proaktif.hentikan()
         memori.tutup()
+        if _KAMERA_TERSEDIA:
+            lepas_kamera(state["kamera_cap"])
         tutup_dashboard()
         tampilkan_divider()
         tampilkan_status("Friday berhasil dimatikan. Memori tersimpan.", "sukses")

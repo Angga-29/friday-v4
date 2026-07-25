@@ -1,118 +1,113 @@
 # ==============================================================
-# skills/aplikasi.py — Friday | Skill Buka Aplikasi Android
+# skills/aplikasi.py — Friday | Skill Buka Aplikasi (Windows Desktop)
+# Versi : 2.0.0 — Port dari Android (am start) ke Windows
 # ==============================================================
+"""
+Setiap entri APP_MAP berisi (nama, alias_list, cara_buka) di mana
+cara_buka adalah salah satu:
+  ("exe", "notepad.exe")            → dibuka via os.startfile (harus ada di PATH)
+  ("path", "%APPDATA%\\Spotify\\Spotify.exe")  → path executable (env var di-expand)
+  ("shell", "start ms-settings:")   → dijalankan lewat cmd /c start ...
+  ("web", "https://web.whatsapp.com") → dibuka di browser default (app tanpa client desktop)
+"""
+import os
 import subprocess
 from typing import Optional
 
-NAMA      = "Kontrol Aplikasi Android"
+NAMA      = "Kontrol Aplikasi Desktop"
 PRIORITAS = 5   # Tinggi — dicek sebelum skill lain
 
 TRIGGER_WORDS = [
     "buka", "jalankan", "nyalakan", "aktifkan", "launch",
 ]
 
-# Peta nama app → package Android
-# alias: kata-kata yang dikenali dari suara user
+# Peta nama app → alias suara → cara membuka di Windows
 APP_MAP = [
-    # ── Sosial & Pesan ──
-    ("spotify",         "com.spotify.music",              ["spotify", "spotipai"]),
-    ("youtube",         "com.google.android.youtube",     ["youtube", "you tube", "yt"]),
-    ("youtube music",   "com.google.android.apps.youtube.music", ["youtube music", "yt music"]),
-    ("whatsapp",        "com.whatsapp",                   ["whatsapp", "wa", "watsap"]),
-    ("instagram",       "com.instagram.android",          ["instagram", "ig", "insta"]),
-    ("tiktok",          "com.zhiliaoapp.musically",       ["tiktok", "tik tok"]),
-    ("telegram",        "org.telegram.messenger",         ["telegram"]),
-    ("line",            "jp.naver.line.android",          ["line"]),
-    ("twitter",         "com.twitter.android",            ["twitter", "x", "twiter"]),
-    ("facebook",        "com.facebook.katana",            ["facebook", "fb"]),
-    ("discord",         "com.discord",                    ["discord"]),
-    ("zoom",            "us.zoom.videomeetings",          ["zoom", "zum"]),
-    ("gmail",           "com.google.android.gm",          ["gmail", "email", "mail"]),
+    # ── Aplikasi desktop asli (path instalasi umum) ──
+    ("spotify",   ["spotify", "spotipai"],
+        ("path", r"%APPDATA%\Spotify\Spotify.exe")),
+    ("discord",   ["discord"],
+        ("path", r"%LOCALAPPDATA%\Discord\Update.exe --processStart Discord.exe")),
+    ("telegram",  ["telegram"],
+        ("path", r"%APPDATA%\Telegram Desktop\Telegram.exe")),
+    ("whatsapp",  ["whatsapp", "wa", "watsap"],
+        ("web", "https://web.whatsapp.com")),
+    ("zoom",      ["zoom", "zum"],
+        ("path", r"%APPDATA%\Zoom\bin\Zoom.exe")),
+    ("chrome",    ["chrome", "browser", "google chrome"],
+        ("shell", "start chrome")),
 
-    # ── E-Wallet & Banking ──
-    ("dana",            "id.dana",                        ["dana"]),
-    ("ovo",             "ovo.id",                         ["ovo"]),
-    ("gopay",           "com.gojek.app",                  ["gopay", "go pay"]),
-    ("bca mobile",      "com.bca",                        ["bca", "bca mobile", "mybca"]),
-    ("brimo",           "id.co.bri.brimo",                ["brimo", "bri", "bri mobile"]),
-    ("mandiri online",  "com.bankmandiri.mandirionline",  ["mandiri", "mandiri online", "livin"]),
+    # ── Utilitas sistem Windows ──
+    ("kalkulator",     ["kalkulator", "calculator"], ("exe", "calc.exe")),
+    ("notepad",        ["notepad", "catatan"],       ("exe", "notepad.exe")),
+    ("file explorer",  ["file explorer", "explorer", "berkas"], ("exe", "explorer.exe")),
+    ("pengaturan",     ["pengaturan", "settings", "setelan"], ("shell", "start ms-settings:")),
+    ("kamera",         ["kamera", "camera", "kamer"], ("shell", "start microsoft.windows.camera:")),
+    ("task manager",   ["task manager", "pengelola tugas"], ("exe", "taskmgr.exe")),
 
-    # ── Browser & Sistem ──
-    ("chrome",          "com.android.chrome",             ["chrome", "browser", "google chrome"]),
-    ("play store",      "com.android.vending",            ["play store", "playstore", "google play"]),
-    ("maps",            "com.google.android.apps.maps",   ["maps", "google maps", "peta", "navigasi"]),
-    ("kamera",          "com.android.camera2",            ["kamera", "camera", "kamer"]),
-    ("galeri",          "com.google.android.apps.photos", ["galeri", "gallery", "foto", "gambar"]),
-    ("kalkulator",      "com.android.calculator2",        ["kalkulator", "calculator"]),
-    ("pengaturan",      "com.android.settings",           ["pengaturan", "settings", "setelan"]),
-    ("jam",             "com.android.deskclock",          ["jam", "clock", "alarm"]),
-
-    # ── Hiburan & Belanja ──
-    ("netflix",         "com.netflix.mediaclient",        ["netflix"]),
-    ("capcut",          "com.lemon.lvoverseas",           ["capcut", "cap cut"]),
-    ("gojek",           "com.gojek.app",                  ["gojek", "go jek"]),
-    ("grab",            "com.grabtaxi.passenger",         ["grab"]),
-    ("tokopedia",       "com.tokopedia.tkpd",             ["tokopedia", "toped"]),
-    ("shopee",          "com.shopee.id",                  ["shopee"]),
+    # ── Web (tanpa client desktop Windows resmi) ──
+    ("youtube",        ["youtube", "you tube", "yt"], ("web", "https://youtube.com")),
+    ("youtube music",  ["youtube music", "yt music"], ("web", "https://music.youtube.com")),
+    ("instagram",      ["instagram", "ig", "insta"], ("web", "https://instagram.com")),
+    ("tiktok",         ["tiktok", "tik tok"], ("web", "https://tiktok.com")),
+    ("twitter",        ["twitter", "x", "twiter"], ("web", "https://x.com")),
+    ("facebook",       ["facebook", "fb"], ("web", "https://facebook.com")),
+    ("gmail",          ["gmail", "email", "mail"], ("web", "https://mail.google.com")),
+    ("maps",           ["maps", "google maps", "peta", "navigasi"], ("web", "https://maps.google.com")),
+    ("netflix",        ["netflix"], ("web", "https://netflix.com")),
+    ("gojek",          ["gojek", "go jek"], ("web", "https://gojek.com")),
+    ("tokopedia",      ["tokopedia", "toped"], ("web", "https://tokopedia.com")),
+    ("shopee",         ["shopee"], ("web", "https://shopee.co.id")),
 ]
 
 
 def _cari_app(teks_lower: str):
-    """Cari app yang disebutkan dalam teks. Return (nama, package) atau None."""
-    for nama, pkg, alias_list in APP_MAP:
+    """Cari app yang disebutkan dalam teks. Return (nama, cara_buka) atau (None, None)."""
+    for nama, alias_list, cara_buka in APP_MAP:
         for alias in alias_list:
             if alias in teks_lower:
-                return nama, pkg
+                return nama, cara_buka
     return None, None
 
 
-def _buka_package(pkg: str) -> bool:
-    """Coba buka app Android via beberapa metode."""
+def _buka_app(cara_buka) -> bool:
+    """Buka aplikasi sesuai jenis cara_buka."""
+    jenis, target = cara_buka
 
-    # Metode 1: am start (Activity Manager — tersedia di Termux)
     try:
-        ret = subprocess.run(
-            ["am", "start", "-n", f"{pkg}/.MainActivity"],
-            capture_output=True, timeout=5
-        )
-        if ret.returncode == 0:
-            return True
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
+        if jenis == "web":
+            import webbrowser
+            return webbrowser.open(target)
 
-    # Metode 2: am start tanpa activity (lebih fleksibel)
-    try:
-        ret = subprocess.run(
-            ["am", "start", pkg],
-            capture_output=True, timeout=5
-        )
-        if ret.returncode == 0:
+        if jenis == "exe":
+            os.startfile(target)
             return True
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
 
-    # Metode 3: monkey launcher (tersedia di semua Android)
-    try:
-        ret = subprocess.run(
-            ["monkey", "-p", pkg, "-c",
-             "android.intent.category.LAUNCHER", "1"],
-            capture_output=True, timeout=5
-        )
-        if ret.returncode == 0:
+        if jenis == "path":
+            path_expanded = os.path.expandvars(target)
+            if " " in path_expanded and "--" in path_expanded:
+                # Path dengan argumen (mis. Discord Update.exe --processStart)
+                bagian = path_expanded.split(" ", 1)
+                subprocess.Popen(
+                    [bagian[0]] + bagian[1].split(),
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                )
+                return True
+            if not os.path.exists(path_expanded):
+                return False
+            os.startfile(path_expanded)
             return True
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
 
-    # Metode 4: termux-open-url dengan intent
-    try:
-        ret = subprocess.run(
-            ["termux-open-url", f"intent:#Intent;package={pkg};end"],
-            capture_output=True, timeout=5
-        )
-        if ret.returncode == 0:
+        if jenis == "shell":
+            subprocess.Popen(
+                ["cmd", "/c", target],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
             return True
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
+
+    except (FileNotFoundError, OSError, AttributeError):
+        # AttributeError: os.startfile hanya ada di Windows
+        return False
 
     return False
 
@@ -120,26 +115,24 @@ def _buka_package(pkg: str) -> bool:
 def jalankan(teks: str, **ctx) -> Optional[str]:
     teks_lower = teks.lower()
 
-    # Harus ada kata buka/jalankan/dll
     kata_buka = ["buka", "jalankan", "nyalakan", "aktifkan", "launch"]
     if not any(k in teks_lower for k in kata_buka):
         return None
 
-    nama, pkg = _cari_app(teks_lower)
+    nama, cara_buka = _cari_app(teks_lower)
     if not nama:
         return None
 
-    # Tampilkan panel di layar
     try:
         from modules.tampilan import tampilkan_app_dibuka
         tampilkan_app_dibuka(nama.capitalize())
     except ImportError:
         pass
 
-    if _buka_package(pkg):
+    if _buka_app(cara_buka):
         return f"{nama.capitalize()} dibuka, Bos."
     else:
         return (
             f"Tidak bisa membuka {nama.capitalize()}. "
-            f"Pastikan aplikasinya terinstall dan Termux punya izin."
+            f"Pastikan aplikasinya terinstall di lokasi standar."
         )

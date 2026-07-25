@@ -1,21 +1,15 @@
 # ==============================================================
 # modules/suara.py — Project Friday | Modul TTS
-# Versi : 4.3.0 — Fix asyncio conflict: Edge-TTS di thread terpisah
+# Versi : 5.0.0 — Port ke Windows: pyttsx3 (SAPI5) ganti Termux TTS
 # ==============================================================
 """
 Urutan fallback TTS:
   1. Edge-TTS  (Microsoft Neural, online, suara terbaik)
-  2. Termux TTS (termux-tts-speak, offline, native Android)
-  3. gTTS       (Google TTS, online)
+  2. pyttsx3   (SAPI5 Windows, offline, native — pengganti termux-tts-speak)
+  3. gTTS      (Google TTS, online)
 
 Urutan fallback audio player (semua BLOCKING):
-  mpv → ffplay → play (sox)
-
-CATATAN: termux-media-player SENGAJA tidak dipakai karena
-perintah 'play' bersifat non-blocking — audio masih berjalan
-di background sementara subprocess sudah return, sehingga
-_sedang_bicara di-clear terlalu cepat dan menyebabkan
-Friday mendengar suaranya sendiri.
+  mpv → ffplay
 
 Anti-echo:
   _sedang_bicara (threading.Event) di-set SEBELUM audio diputar
@@ -125,12 +119,8 @@ def _putar_audio(file_path: str) -> bool:
         return False
 
     players = [
-        # --ao=opensles diperlukan di Android/Termux untuk output audio
         ("mpv",    ["mpv", "--no-video", "--volume=100",
-                    "--ao=opensles", "--quiet", "--really-quiet", file_path]),
-        # Fallback: mpv dengan ao=android jika opensles tidak tersedia
-        ("mpv-ao-android", ["mpv", "--no-video", "--volume=100",
-                    "--ao=android", "--quiet", "--really-quiet", file_path]),
+                    "--quiet", "--really-quiet", file_path]),
         ("ffplay", ["ffplay", "-nodisp", "-autoexit",
                     "-volume", "100", "-loglevel", "quiet", file_path]),
     ]
@@ -171,10 +161,53 @@ def _putar_audio(file_path: str) -> bool:
     if not _mpv_missing_logged:
         _mpv_missing_logged = True
         tampilkan_status(
-            "mpv/ffplay tidak bisa memutar audio → pakai Termux TTS sebagai fallback.",
+            "mpv/ffplay tidak bisa memutar audio → pakai pyttsx3 sebagai fallback.",
             "peringatan"
         )
     return False
+
+
+def _bicara_pyttsx3(teks: str) -> bool:
+    """
+    TTS offline via pyttsx3 (membungkus SAPI5 di Windows).
+    Dijalankan di thread terpisah supaya bisa diinterupsi (barge-in)
+    lewat engine.stop() tanpa memblokir thread utama.
+    """
+    try:
+        import pyttsx3
+    except ImportError:
+        return False
+
+    try:
+        engine = pyttsx3.init()
+    except Exception as e:
+        tampilkan_status(f"pyttsx3 gagal init: {e}", "peringatan")
+        return False
+
+    hasil = [False]
+
+    def _run():
+        try:
+            engine.say(teks)
+            engine.runAndWait()
+            hasil[0] = True
+        except Exception as e:
+            tampilkan_status(f"pyttsx3 error: {e}", "peringatan")
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+
+    while t.is_alive():
+        if _interrupt_event.is_set():
+            try:
+                engine.stop()
+            except Exception:
+                pass
+            t.join(timeout=1)
+            return True   # dianggap selesai (diinterrupt)
+        time.sleep(0.05)
+
+    return hasil[0]
 
 
 def bicara(teks: str) -> None:
@@ -234,32 +267,11 @@ def _bicara_internal(teks_bersih: str) -> None:
             except OSError:
                 pass
 
-    # ── PRIORITAS 2: Termux TTS (interruptible via Popen) ──
-    try:
-        tampilkan_status("Bicara via Termux TTS...", "info")
-        proc = subprocess.Popen(
-            ["termux-tts-speak", teks_bersih],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        )
-        _proses_audio = proc
-        while proc.poll() is None:
-            if _interrupt_event.is_set():
-                proc.terminate()
-                try:
-                    proc.wait(timeout=1)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
-                _proses_audio = None
-                return
-            time.sleep(0.05)
-        _proses_audio = None
-        if proc.returncode == 0:
-            tampilkan_status("Audio selesai via Termux TTS.", "info")
-            return
-    except FileNotFoundError:
-        tampilkan_status("termux-tts-speak tidak ada. Install: pkg install termux-api", "error")
-    except Exception as e:
-        tampilkan_status(f"Termux TTS error: {e}", "peringatan")
+    # ── PRIORITAS 2: pyttsx3 / SAPI5 Windows (offline, interruptible) ──
+    tampilkan_status("Bicara via pyttsx3 (SAPI5)...", "info")
+    if _bicara_pyttsx3(teks_bersih):
+        tampilkan_status("Audio selesai via pyttsx3.", "info")
+        return
 
     # ── PRIORITAS 3: gTTS + audio player ──────────────────
     try:

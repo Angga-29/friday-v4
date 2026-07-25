@@ -1,176 +1,149 @@
 # ==============================================================
-# modules/kamera.py — Project Friday | Modul Kamera (IP Webcam)
-# Versi : 3.0.1 — Multi-endpoint IPWebcam + health check
+# modules/kamera.py — Project Friday | Modul Kamera (USB Webcam)
+# Versi : 4.0.0 — Pindah dari IP Webcam (HTTP) ke USB webcam lokal
 # ==============================================================
 """
-Kompatibel dengan aplikasi IPWebcam (Android).
-Endpoint yang didukung secara otomatis:
-  /shot.jpg    — snapshot JPEG (direkomendasikan, hemat baterai)
-  /video       — stream MJPEG (cadangan)
+Kompatibel dengan webcam USB apa pun yang dikenali Windows sebagai
+device video (mis. eMeet C960). Kamera dibuka SEKALI saat startup
+(cv2.VideoCapture) dan dibaca ulang tiap frame lewat cap.read() —
+bukan request HTTP baru seperti versi IP Webcam sebelumnya.
 
-Setup IPWebcam di Android:
-  1. Install "IP Webcam" dari Play Store
-  2. Buka aplikasi → Start server
-  3. Catat IP:PORT yang muncul (contoh: 192.168.1.5:8080)
-  4. Set URL_KAMERA di config.py atau .env
+Setup:
+  1. Colokkan webcam USB ke desktop.
+  2. Cari index device yang benar (biasanya 0 jika cuma 1 kamera):
+       python -c "from modules.kamera import daftar_kamera_tersedia; daftar_kamera_tersedia()"
+  3. Set CAMERA_INDEX di config.py atau .env sesuai hasil di atas.
 """
 
 import cv2
-import requests
-import numpy as np
-import time
+import platform
 from modules.tampilan import tampilkan_status
 
 # --- Konfigurasi ---
 RESIZE_WIDTH    = 640
 RESIZE_HEIGHT   = 480
-REQUEST_TIMEOUT = 3       # detik
 MAX_RETRY       = 5
 RETRY_DELAY     = 2       # detik
 
-# Endpoint alternatif IPWebcam yang dicoba secara berurutan
-IPWEBCAM_ENDPOINTS = ["/shot.jpg", "/photo.jpg", "/jpeg"]
+
+def _backend_kamera():
+    """DirectShow paling stabil untuk USB webcam di Windows; default di OS lain."""
+    if platform.system() == "Windows":
+        return cv2.CAP_DSHOW
+    return cv2.CAP_ANY
 
 
-def _ekstrak_base_url(url: str) -> str:
+def inisialisasi_kamera(index: int):
     """
-    Ekstrak base URL (tanpa endpoint) dari URL lengkap.
-    Contoh: "http://192.168.1.5:8080/shot.jpg" → "http://192.168.1.5:8080"
-    """
-    for endpoint in IPWEBCAM_ENDPOINTS + ["/video", "/"]:
-        if url.endswith(endpoint):
-            return url[: -len(endpoint)]
-    # Potong path terakhir jika ada
-    bagian = url.rsplit("/", 1)
-    return bagian[0] if len(bagian) > 1 else url
-
-
-def temukan_endpoint_aktif(base_url: str) -> str | None:
-    """
-    Coba beberapa endpoint IPWebcam secara berurutan.
-    Berguna jika versi IPWebcam berbeda menggunakan endpoint yang berbeda.
+    Membuka koneksi ke webcam USB dengan retry otomatis.
 
     Args:
-        base_url: URL dasar, contoh "http://192.168.1.5:8080"
+        index: Index device webcam (mis. 0, 1, 2 ...).
 
     Returns:
-        URL endpoint yang aktif, atau None jika semua gagal.
+        Tuple (cap, frame_pertama) — cap adalah cv2.VideoCapture yang
+        harus disimpan & dipakai ulang oleh ambil_frame(). Jika gagal,
+        return (None, None).
     """
-    for endpoint in IPWEBCAM_ENDPOINTS:
-        url_coba = base_url.rstrip("/") + endpoint
-        try:
-            resp = requests.get(url_coba, timeout=REQUEST_TIMEOUT)
-            if resp.status_code == 200 and len(resp.content) > 1000:
-                tampilkan_status(f"Endpoint aktif: {endpoint}", "sukses")
-                return url_coba
-        except Exception:
-            continue
-    return None
+    tampilkan_status(f"Menghubungkan ke kamera (index {index})...", "info")
 
-
-def ambil_frame(url_kamera: str) -> np.ndarray | None:
-    """
-    Mengambil satu frame dari IP Webcam (snapshot JPEG).
-
-    Args:
-        url_kamera: URL endpoint kamera (contoh: http://192.168.x.x:8080/shot.jpg)
-
-    Returns:
-        Frame sebagai numpy array BGR (640×480), atau None jika gagal.
-    """
-    try:
-        resp = requests.get(url_kamera, timeout=REQUEST_TIMEOUT)
-        resp.raise_for_status()
-
-        img_arr = np.frombuffer(resp.content, dtype=np.uint8)
-        img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
-
-        if img is None:
-            tampilkan_status("Gagal decode gambar dari kamera.", "error")
-            return None
-
-        return cv2.resize(img, (RESIZE_WIDTH, RESIZE_HEIGHT))
-
-    except requests.exceptions.Timeout:
-        tampilkan_status("Timeout: Kamera tidak merespons.", "error")
-        return None
-    except requests.exceptions.ConnectionError:
-        tampilkan_status("Koneksi ke kamera terputus.", "error")
-        return None
-    except Exception as e:
-        tampilkan_status(f"Error kamera: {e}", "error")
-        return None
-
-
-def inisialisasi_kamera(url_kamera: str) -> np.ndarray | None:
-    """
-    Menghubungkan ke kamera dengan retry otomatis.
-    Jika URL utama gagal, coba endpoint IPWebcam lainnya + multi base URL.
-    """
-    tampilkan_status(f"Menghubungkan ke kamera: {url_kamera}", "info")
-
-    # Coba URL yang diberikan terlebih dahulu
     for percobaan in range(1, MAX_RETRY + 1):
-        frame = ambil_frame(url_kamera)
-        if frame is not None:
-            tampilkan_status(
-                f"Kamera terhubung! (percobaan ke-{percobaan})", "sukses"
-            )
-            return frame
+        cap = cv2.VideoCapture(index, _backend_kamera())
+        if cap.isOpened():
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, RESIZE_WIDTH)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, RESIZE_HEIGHT)
+            ok, frame = cap.read()
+            if ok and frame is not None:
+                tampilkan_status(
+                    f"Kamera terhubung! (percobaan ke-{percobaan})", "sukses"
+                )
+                return cap, cv2.resize(frame, (RESIZE_WIDTH, RESIZE_HEIGHT))
+            cap.release()
 
         tampilkan_status(
             f"Percobaan {percobaan}/{MAX_RETRY} gagal. Tunggu {RETRY_DELAY}s...",
             "peringatan"
         )
+        import time
         time.sleep(RETRY_DELAY)
 
-    # Fallback 1: coba endpoint alternatif di base URL yang sama
-    tampilkan_status("Mencoba endpoint IPWebcam alternatif...", "info")
-    base_url = _ekstrak_base_url(url_kamera)
-    url_aktif = temukan_endpoint_aktif(base_url)
-
-    if url_aktif:
-        tampilkan_status(
-            f"Gunakan URL ini di config.py:\n  URL_KAMERA = \"{url_aktif}\"",
-            "peringatan"
-        )
-        return ambil_frame(url_aktif)
-
-    # Fallback 2: jika user pakai 127.0.0.1, coba juga IP umum lainnya
-    if "127.0.0.1" in url_kamera or "localhost" in url_kamera:
-        tampilkan_status(
-            "URL pakai localhost — coba juga IP WiFi tablet...", "info"
-        )
-        ip_alternatif = ["192.168.1.1", "192.168.0.1", "10.0.0.1"]
-        for ip in ip_alternatif:
-            url_coba = f"http://{ip}:8080/shot.jpg"
-            try:
-                resp = requests.get(url_coba, timeout=2)
-                if resp.status_code == 200 and len(resp.content) > 1000:
-                    tampilkan_status(
-                        f"Endpoint aktif: {url_coba}\n"
-                        f"  Update config.py: URL_KAMERA = \"{url_coba}\"",
-                        "sukses"
-                    )
-                    return ambil_frame(url_coba)
-            except Exception:
-                continue
-
     tampilkan_status(
-        "Tidak dapat terhubung ke kamera.\n"
+        f"Tidak dapat terhubung ke kamera index {index}.\n"
         "Cek poin berikut:\n"
-        "  1. Aplikasi IP Webcam sudah Start server (lampu hijau aktif)\n"
-        "  2. URL_KAMERA di config.py sesuai dengan yang ditampilkan IP Webcam\n"
-        "  3. Jika IP Webcam di tablet sama → coba: http://127.0.0.1:8080/shot.jpg\n"
-        "  4. Jika IP Webcam di HP lain → pastikan WiFi sama + isi IP HP\n"
-        "  5. Coba buka URL di browser dulu untuk test\n"
+        "  1. Webcam USB (eMeet C960) sudah tercolok & terdeteksi Windows\n"
+        "  2. CAMERA_INDEX di config.py sesuai — cek dengan:\n"
+        "     python -c \"from modules.kamera import daftar_kamera_tersedia; "
+        "daftar_kamera_tersedia()\"\n"
+        "  3. Tidak ada aplikasi lain (Zoom/Teams/Camera app) yang sedang "
+        "memakai kamera\n"
         "Friday akan jalan dalam mode SUARA SAJA.",
         "error"
     )
-    return None
+    return None, None
 
 
-def ke_grayscale_blur(frame: np.ndarray) -> np.ndarray:
+def ambil_frame(cap) -> "cv2.typing.MatLike | None":
+    """
+    Mengambil satu frame terbaru dari webcam yang sudah terbuka.
+
+    Args:
+        cap: Objek cv2.VideoCapture dari inisialisasi_kamera().
+
+    Returns:
+        Frame BGR (640×480), atau None jika gagal/cap tidak valid.
+    """
+    if cap is None or not cap.isOpened():
+        return None
+    try:
+        ok, frame = cap.read()
+        if not ok or frame is None:
+            return None
+        return cv2.resize(frame, (RESIZE_WIDTH, RESIZE_HEIGHT))
+    except Exception as e:
+        tampilkan_status(f"Error kamera: {e}", "error")
+        return None
+
+
+def lepas_kamera(cap):
+    """Tutup koneksi kamera dengan aman saat Friday berhenti."""
+    if cap is not None:
+        try:
+            cap.release()
+        except Exception:
+            pass
+
+
+def daftar_kamera_tersedia(maks_index: int = 5):
+    """
+    Bantu user menemukan index kamera yang benar — coba buka index
+    0..maks_index-1 satu per satu dan laporkan mana yang aktif.
+
+    Usage:
+        python -c "from modules.kamera import daftar_kamera_tersedia; daftar_kamera_tersedia()"
+    """
+    backend = _backend_kamera()
+    ditemukan = []
+    for i in range(maks_index):
+        cap = cv2.VideoCapture(i, backend)
+        if cap.isOpened():
+            ok, frame = cap.read()
+            lebar  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            tinggi = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            status = "OK, dapat frame" if ok and frame is not None else "terbuka tapi tidak ada frame"
+            print(f"  [index {i}] {status} — resolusi default {lebar}x{tinggi}")
+            ditemukan.append(i)
+            cap.release()
+        else:
+            print(f"  [index {i}] tidak tersedia")
+    if ditemukan:
+        print(f"\nIndex yang terdeteksi: {ditemukan}. "
+              f"Set CAMERA_INDEX={ditemukan[0]} di config.py/.env jika itu eMeet C960.")
+    else:
+        print("\nTidak ada kamera terdeteksi sama sekali. Cek koneksi USB & driver.")
+    return ditemukan
+
+
+def ke_grayscale_blur(frame):
     """
     Ubah frame BGR ke grayscale + Gaussian blur untuk deteksi gerakan & wajah.
 

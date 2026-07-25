@@ -1,6 +1,8 @@
 # ==============================================================
-# skills/musik.py — Friday | Kontrol Musik
-# v2.0 — Spotify + musik lokal + volume + next/prev
+# skills/musik.py — Friday | Kontrol Musik (Windows Desktop)
+# v3.0 — Port dari Android (termux-media-player/intent) ke Windows
+#        virtual media key via ctypes, sistem-wide untuk Spotify
+#        Desktop/browser/app apa pun yang sedang fokus/aktif.
 # ==============================================================
 import glob
 import os
@@ -31,6 +33,13 @@ TRIGGER_WORDS = [
 
 _proses_mpv: Optional[subprocess.Popen] = None
 
+# Virtual-key code Windows untuk media key (dipakai via keybd_event)
+VK_MEDIA_NEXT_TRACK = 0xB0
+VK_MEDIA_PREV_TRACK = 0xB1
+VK_MEDIA_PLAY_PAUSE = 0xB3
+VK_VOLUME_UP        = 0xAF
+VK_VOLUME_DOWN      = 0xAE
+
 
 # ── Helpers ───────────────────────────────────────────────────
 
@@ -44,10 +53,8 @@ def _tampil_musik(aksi: str, detail: str = ""):
 
 def _cari_file_lokal() -> list:
     direktori = [
+        os.path.expanduser("~\\Music"),
         os.path.expanduser("~/Music"),
-        "/sdcard/Music",
-        "/sdcard/musik",
-        "/storage/emulated/0/Music",
     ]
     files = []
     for d in direktori:
@@ -57,96 +64,61 @@ def _cari_file_lokal() -> list:
     return files
 
 
+def _kirim_media_key(vk_code: int) -> bool:
+    """
+    Simulasikan penekanan virtual media key Windows via ctypes/user32.
+    Bekerja system-wide (Spotify Desktop, browser, app apa pun) tanpa
+    perlu API khusus per-aplikasi — menggantikan broadcast intent Android.
+    """
+    try:
+        import ctypes
+        user32 = ctypes.windll.user32   # hanya ada di Windows
+        KEYEVENTF_EXTENDEDKEY = 0x0001
+        KEYEVENTF_KEYUP       = 0x0002
+        user32.keybd_event(vk_code, 0, KEYEVENTF_EXTENDEDKEY, 0)
+        user32.keybd_event(vk_code, 0, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, 0)
+        return True
+    except (AttributeError, OSError):
+        # ctypes.windll hanya tersedia di Windows
+        return False
+
+
 def _kontrol_media(aksi: str) -> bool:
-    """
-    Kontrol media playback Android — pause, play, next, prev.
-    Urutan: termux-media-player → input keyevent → am broadcast Spotify.
-    termux-media-player menggunakan MediaSession Android sehingga
-    langsung menjangkau Spotify tanpa perlu root.
-    """
-    # ── Metode 1: termux-media-player (terbaik — pakai MediaSession) ──
-    # Tersedia jika Termux:API terinstall (pkg install termux-api)
-    termux_cmd = {
-        "play_pause": ["termux-media-player", "play"],  # toggle
-        "pause":      ["termux-media-player", "pause"],
-        "play":       ["termux-media-player", "play"],
-        "next":       ["termux-media-player", "next"],
-        "previous":   ["termux-media-player", "previous"],
+    """Kontrol media playback: play/pause, next, prev via virtual media key."""
+    kode = {
+        "play_pause": VK_MEDIA_PLAY_PAUSE,
+        "pause":      VK_MEDIA_PLAY_PAUSE,
+        "play":       VK_MEDIA_PLAY_PAUSE,
+        "next":       VK_MEDIA_NEXT_TRACK,
+        "previous":   VK_MEDIA_PREV_TRACK,
     }.get(aksi)
-
-    if termux_cmd:
-        try:
-            ret = subprocess.run(termux_cmd, capture_output=True, timeout=5)
-            if ret.returncode == 0:
-                return True
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            pass
-
-    # ── Metode 2: Spotify broadcast intent langsung ────────────────
-    spotify_aksi = {
-        "play_pause": "com.spotify.mobile.android.ui.widget.PLAY_PAUSE",
-        "pause":      "com.spotify.mobile.android.ui.widget.PAUSE",
-        "play":       "com.spotify.mobile.android.ui.widget.PLAY",
-        "next":       "com.spotify.mobile.android.ui.widget.NEXT",
-        "previous":   "com.spotify.mobile.android.ui.widget.PREVIOUS",
-    }.get(aksi)
-
-    if spotify_aksi:
-        try:
-            ret = subprocess.run(
-                ["am", "broadcast", "-a", spotify_aksi,
-                 "-p", "com.spotify.music"],
-                capture_output=True, timeout=5
-            )
-            if ret.returncode == 0:
-                return True
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            pass
-
-    # ── Metode 3: input keyevent (fallback terakhir) ───────────────
-    # 85=MEDIA_PLAY_PAUSE (toggle), 126=MEDIA_PLAY (explicit), 127=MEDIA_PAUSE
-    kode = {"play_pause": "85", "pause": "127", "play": "126",
-            "next": "87", "previous": "88"}.get(aksi)
-    if kode:
-        try:
-            ret = subprocess.run(
-                ["input", "keyevent", kode],
-                capture_output=True, timeout=3
-            )
-            return ret.returncode == 0
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            pass
-
-    return False
+    return _kirim_media_key(kode) if kode else False
 
 
 def _atur_volume(arah: str) -> str:
-    """Naikkan atau turunkan volume media Android."""
-    kode = "24" if arah == "naik" else "25"
-    try:
-        for _ in range(3):
-            subprocess.run(["input", "keyevent", kode],
-                           capture_output=True, timeout=2)
-        return f"Volume {'dinaikkan' if arah == 'naik' else 'diturunkan'}."
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    """Naikkan atau turunkan volume sistem lewat virtual media key."""
+    vk = VK_VOLUME_UP if arah == "naik" else VK_VOLUME_DOWN
+    berhasil = any(_kirim_media_key(vk) for _ in range(3))
+    if not berhasil:
         return "Tidak bisa mengatur volume."
+    return f"Volume {'dinaikkan' if arah == 'naik' else 'diturunkan'}."
 
 
 def _buka_spotify() -> bool:
-    pkg = "com.spotify.music"
-    for cmd in [
-        # Syntax am start yang benar untuk Termux/Android
-        ["am", "start", "-a", "android.intent.action.MAIN",
-         "-c", "android.intent.category.LAUNCHER", "-p", pkg],
-        ["monkey", "-p", pkg, "-c", "android.intent.category.LAUNCHER", "1"],
-    ]:
-        try:
-            ret = subprocess.run(cmd, capture_output=True, timeout=5)
-            if ret.returncode == 0:
-                return True
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            continue
-    return False
+    """Coba buka Spotify Desktop (path instalasi default Windows), fallback web player."""
+    path = os.path.expandvars(r"%APPDATA%\Spotify\Spotify.exe")
+    try:
+        if os.path.exists(path):
+            os.startfile(path)
+            return True
+    except (AttributeError, OSError):
+        pass
+
+    try:
+        import webbrowser
+        return webbrowser.open("https://open.spotify.com")
+    except Exception:
+        return False
 
 
 # ── Skill entry point ─────────────────────────────────────────
@@ -170,9 +142,6 @@ def jalankan(teks: str, **ctx) -> Optional[str]:
     if any(k in teks_lower for k in
            ["berikutnya", "next", "skip", "ganti lagu"]):
         _tampil_musik("▶▶ Next Track")
-        if _proses_mpv and _proses_mpv.poll() is None:
-            # mpv: kirim 'q' lalu maju ke lagu berikut via playlist
-            _proses_mpv.stdin and None   # mpv tidak pakai stdin di mode ini
         _kontrol_media("next")
         return "Lagu selanjutnya."
 
@@ -190,10 +159,10 @@ def jalankan(teks: str, **ctx) -> Optional[str]:
             _proses_mpv.terminate()
             _proses_mpv = None
             dihentikan = True
-        # Pause Spotify via MediaSession (termux-media-player pause)
+        # Pause Spotify/app aktif via virtual media key
         _kontrol_media("pause")
         _tampil_musik("⏹ Musik Dijeda")
-        return "Musik dihentikan." if dihentikan else "Spotify dijeda."
+        return "Musik dihentikan." if dihentikan else "Musik dijeda."
 
     # ── LANJUTKAN / RESUME ────────────────────────────────────
     if any(k in teks_lower for k in
@@ -206,11 +175,10 @@ def jalankan(teks: str, **ctx) -> Optional[str]:
     if "spotify" in teks_lower:
         _tampil_musik("▶ Membuka Spotify")
         if _buka_spotify():
-            # Kirim play setelah jeda singkat
             import time; time.sleep(1.5)
             _kontrol_media("play_pause")
             return "Spotify dibuka dan diputar, Bos."
-        return "Tidak bisa membuka Spotify. Pastikan aplikasinya terinstall."
+        return "Tidak bisa membuka Spotify."
 
     # ── MUSIK LOKAL (mpv) ─────────────────────────────────────
     files = _cari_file_lokal()
@@ -238,4 +206,4 @@ def jalankan(teks: str, **ctx) -> Optional[str]:
         _tampil_musik("▶ Memutar Musik Lokal", f"{len(files)} lagu (acak)")
         return f"Memutar {len(files)} lagu lokal secara acak. Nikmati, Bos!"
     except FileNotFoundError:
-        return "mpv tidak terinstall. Jalankan: pkg install mpv"
+        return "mpv tidak terinstall. Install dari https://mpv.io atau via winget."

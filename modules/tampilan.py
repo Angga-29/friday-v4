@@ -86,7 +86,7 @@ def tampilkan_header():
     print(C + "╠" + "─" * LEBAR + "╣")
 
     fitur = [
-        ("●", "Gemini 2.5 Flash",     "ONLINE", G),
+        ("●", "Claude AI",            "ONLINE", G),
         ("●", "Edge-TTS  (en-GB-Ryan)", "AKTIF", G),
         ("●", "Wake Word + Clap",      "AKTIF",  G),
         ("●", "Skills System",         "LOADED", G),
@@ -175,10 +175,10 @@ def stop_spinner():
 
 
 # ==============================================================
-# MEMPROSES — Gemini (dengan spinner)
+# MEMPROSES — Claude (dengan spinner)
 # ==============================================================
 def tampilkan_memproses():
-    mulai_spinner("Berpikir via Gemini 2.5")
+    mulai_spinner("Berpikir via Claude")
 
 
 # ==============================================================
@@ -295,7 +295,7 @@ def tampilkan_browsing(query: str):
 def tampilkan_vision():
     print()
     print(M + "  ╔══ " + W + "◑ FRIDAY VISION" + M + " " + "─" * (LEBAR - 17) + "╗")
-    print(M + "  ║  " + W + "Kamera aktif → Gemini Vision menganalisis..." +
+    print(M + "  ║  " + W + "Kamera aktif → Claude Vision menganalisis..." +
           " " * (LEBAR - 46) + M + "║")
     print(M + "  ╚" + "═" * LEBAR + "╝")
     print()
@@ -333,7 +333,7 @@ def tampilkan_musik(aksi: str, detail: str = ""):
 
 
 # ==============================================================
-# STREAMING BUBBLE — tampilkan jawaban Gemini secara live
+# STREAMING BUBBLE — tampilkan jawaban AI secara live
 # ==============================================================
 _ss = {          # stream state
     "aktif"        : False,
@@ -383,7 +383,7 @@ def _cetak_kata(kata: str):
 
 def stream_chunk(chunk: str):
     """
-    Terima potongan teks dari Gemini dan cetak word-by-word ke dalam bubble.
+    Terima potongan teks dari AI dan cetak word-by-word ke dalam bubble.
     Dipanggil berulang saat iterasi generator tanya_stream().
     """
     if not _ss["aktif"] or not chunk:

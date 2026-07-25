@@ -1,22 +1,31 @@
 # ==============================================================
-# modules/penglihatan.py — Project Friday | Gemini Vision
-# Versi : 1.0.1
+# modules/penglihatan.py — Project Friday | Claude Vision
+# Versi : 2.0.0 — Pindah dari Gemini Vision ke Claude Vision
 # Friday bisa "melihat" dan mendeskripsikan apa yang ada di kamera
 # ==============================================================
 """
 Cara kerja:
 1. Frame dari kamera diambil
-2. Frame di-encode menjadi JPEG bytes
-3. Dikirim ke Gemini Vision API beserta pertanyaan
-4. Gemini menjawab dengan deskripsi visual
+2. Frame di-encode menjadi JPEG bytes lalu base64
+3. Dikirim ke Claude (Anthropic) beserta pertanyaan
+4. Claude menjawab dengan deskripsi visual
 
 Kata kunci pemicu: "lihat", "apa yang kamu lihat", "deskripsikan",
                    "ada apa", "siapa di depan kamera"
 """
 
+import base64
 import cv2
-import google.generativeai as genai
 from modules.tampilan import tampilkan_status
+
+try:
+    import anthropic
+    _SDK_TERSEDIA = True
+except ImportError:
+    anthropic = None
+    _SDK_TERSEDIA = False
+
+MODEL_VISION = "claude-sonnet-5"
 
 # Kata kunci yang memicu mode penglihatan
 KATA_KUNCI_VISION = [
@@ -26,19 +35,18 @@ KATA_KUNCI_VISION = [
     "tunjukkan", "perlihatkan"
 ]
 
-# Singleton model — dikonfigurasi sekali saat pertama dipakai
-_vision_model = None
-_vision_api_key = None
+# Singleton client — dibuat sekali saat pertama dipakai
+_client       = None
+_client_key   = None
 
 
-def _dapatkan_model(api_key: str):
-    """Lazy-init Gemini Vision model — konfigurasi hanya sekali."""
-    global _vision_model, _vision_api_key
-    if _vision_model is None or api_key != _vision_api_key:
-        genai.configure(api_key=api_key)
-        _vision_model = genai.GenerativeModel("gemini-2.5-flash")
-        _vision_api_key = api_key
-    return _vision_model
+def _dapatkan_client(api_key: str):
+    """Lazy-init Anthropic client — dibuat hanya sekali."""
+    global _client, _client_key
+    if _client is None or api_key != _client_key:
+        _client     = anthropic.Anthropic(api_key=api_key)
+        _client_key = api_key
+    return _client
 
 
 def perlu_penglihatan(teks: str) -> bool:
@@ -57,12 +65,12 @@ def frame_ke_bytes(frame) -> bytes | None:
 
 def deskripsikan_pemandangan(frame, pertanyaan: str, api_key: str) -> str:
     """
-    Kirim frame ke Gemini Vision untuk dideskripsikan.
+    Kirim frame ke Claude Vision untuk dideskripsikan.
 
     Args:
         frame     : Frame OpenCV (BGR numpy array)
         pertanyaan: Pertanyaan user
-        api_key   : Gemini API key
+        api_key   : Claude (Anthropic) API key
 
     Returns:
         Deskripsi dalam Bahasa Indonesia (maks 3 kalimat).
@@ -70,14 +78,18 @@ def deskripsikan_pemandangan(frame, pertanyaan: str, api_key: str) -> str:
     if frame is None:
         return "Saya tidak bisa melihat — kamera tidak merespons."
 
-    tampilkan_status("Mengirim gambar ke Gemini Vision...", "ai")
+    if not _SDK_TERSEDIA:
+        return "Package 'anthropic' tidak terinstall. Jalankan: pip install anthropic"
+
+    tampilkan_status("Mengirim gambar ke Claude Vision...", "ai")
 
     try:
         img_bytes = frame_ke_bytes(frame)
         if img_bytes is None:
             return "Gagal memproses gambar dari kamera."
 
-        model = _dapatkan_model(api_key)
+        img_b64 = base64.standard_b64encode(img_bytes).decode("utf-8")
+        client  = _dapatkan_client(api_key)
 
         prompt = (
             f"Kamu adalah FRIDAY, asisten AI. Lihat gambar dari kamera ini "
@@ -87,12 +99,26 @@ def deskripsikan_pemandangan(frame, pertanyaan: str, api_key: str) -> str:
             f"PERTANYAAN: {pertanyaan}"
         )
 
-        response = model.generate_content([
-            prompt,
-            {"mime_type": "image/jpeg", "data": img_bytes}
-        ])
+        resp = client.messages.create(
+            model=MODEL_VISION,
+            max_tokens=300,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/jpeg",
+                            "data": img_b64,
+                        },
+                    },
+                    {"type": "text", "text": prompt},
+                ],
+            }],
+        )
 
-        teks = response.text.strip()
+        teks = "".join(blok.text for blok in resp.content if blok.type == "text").strip()
         teks = teks.replace("**", "").replace("*", "")
         teks = teks.replace("##", "").replace("#", "").replace("`", "")
         return teks

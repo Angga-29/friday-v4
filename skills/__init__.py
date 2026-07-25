@@ -3,7 +3,7 @@
 # Terinspirasi dari OpenJarvis Skills Ecosystem
 # ==============================================================
 """
-Skills dieksekusi SEBELUM Gemini — lebih cepat untuk perintah lokal.
+Skills dieksekusi SEBELUM Claude — lebih cepat untuk perintah lokal.
 
 Setiap skill module harus punya:
   NAMA          : str   — Nama tampilan

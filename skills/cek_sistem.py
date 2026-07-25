@@ -3,7 +3,7 @@
 # Terinspirasi dari OpenJarvis 'jarvis doctor' command
 # ==============================================================
 import importlib
-import subprocess
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -25,18 +25,14 @@ def _cek_import(modul: str) -> bool:
 
 
 def _cek_perintah(cmd: str) -> bool:
-    try:
-        return subprocess.run(
-            ["which", cmd], capture_output=True, timeout=3
-        ).returncode == 0
-    except Exception:
-        return False
+    return shutil.which(cmd) is not None
 
 
 def jalankan(teks: str, callback_bicara=None, **ctx) -> Optional[str]:
     paket = [
-        ("Gemini AI",         "google.generativeai"),
+        ("Claude AI (anthropic)", "anthropic"),
         ("Edge-TTS",          "edge_tts"),
+        ("pyttsx3 (SAPI TTS)", "pyttsx3"),
         ("gTTS (fallback)",   "gtts"),
         ("SpeechRecognition", "speech_recognition"),
         ("OpenCV",            "cv2"),
@@ -48,8 +44,7 @@ def jalankan(teks: str, callback_bicara=None, **ctx) -> Optional[str]:
     alat = [
         ("mpv (audio)",  "mpv"),
         ("ffplay (audio)", "ffplay"),
-        ("flac (STT)",   "flac"),
-        ("python3",      "python3"),
+        ("python",       "python"),
     ]
 
     ok_pkg  = [n for n, m in paket if _cek_import(m)]
