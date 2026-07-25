@@ -31,8 +31,18 @@
 
 import time
 import sys
+import os
 import socket
 import threading
+
+# ── Mode headless (dijalankan tanpa jendela terminal, mis. via
+#    start_windows_silent.vbs + pythonw.exe) — semua print()/status
+#    dialihkan ke friday.log supaya tetap bisa didiagnosis. ──
+if os.environ.get("FRIDAY_HEADLESS") == "1":
+    _log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "friday.log")
+    _log_file = open(_log_path, "a", buffering=1, encoding="utf-8")
+    sys.stdout = _log_file
+    sys.stderr = _log_file
 
 import config
 from modules.tampilan    import (

@@ -53,3 +53,7 @@ logs/
 # Hapus baris ini jika ingin menyertakan foto demo
 data/wajah_dikenal/*/
 !data/wajah_dikenal/README.txt
+
+# ── Logo/animasi custom dashboard (aset pribadi) ──────────────
+assets/*
+!assets/README.txt

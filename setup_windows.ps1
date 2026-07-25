@@ -54,8 +54,9 @@ if (-not (Test-Path ".env")) {
     Write-Host "[SKIP] .env sudah ada, tidak ditimpa." -ForegroundColor Yellow
 }
 
-# 6. Buat folder data/wajah_dikenal
+# 6. Buat folder data/wajah_dikenal & assets
 New-Item -ItemType Directory -Force -Path "data\wajah_dikenal" | Out-Null
+New-Item -ItemType Directory -Force -Path "assets" | Out-Null
 
 Write-Host ""
 Write-Host "==================================================================" -ForegroundColor Cyan
@@ -71,5 +72,11 @@ Write-Host "     ollama pull qwen2.5:7b"
 Write-Host "  4. Colokkan webcam USB (eMeet C960), lalu cek index-nya:"
 Write-Host "     python -c ""from modules.kamera import daftar_kamera_tersedia; daftar_kamera_tersedia()"""
 Write-Host "     Set CAMERA_INDEX di .env/config.py sesuai hasilnya."
-Write-Host "  5. Jalankan Friday: .\start_windows.bat"
+Write-Host "  5. (Opsional) Taruh logo/animasi custom di folder assets\ —"
+Write-Host "     lihat assets\README.txt untuk nama file yang benar."
+Write-Host "  6. Jalankan Friday:"
+Write-Host "     - Dengan jendela terminal (untuk lihat log): .\start_windows.bat"
+Write-Host "     - TANPA jendela sama sekali (UI hanya di browser):"
+Write-Host "       double-click start_windows_silent.vbs"
+Write-Host "       (kalau error, cek isi friday.log di folder ini)"
 Write-Host "==================================================================" -ForegroundColor Cyan

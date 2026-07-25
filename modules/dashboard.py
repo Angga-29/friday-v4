@@ -1,17 +1,33 @@
 # ==============================================================
 # modules/dashboard.py — Project Friday | Web Dashboard JARVIS
-# Versi : 1.1.0 — HTTP server lokal (fix Chrome blokir file://)
+# Versi : 2.0.0 — Dukungan logo & animasi custom (folder assets/)
 # ==============================================================
 """
 Cara kerja:
   1. Friday jalankan mini HTTP server di background thread (port 8765)
   2. Setiap request → kirim HTML terbaru
-  3. Chrome dibuka ke http://localhost:8765
-  4. HTML auto-refresh setiap 30 detik → selalu data terbaru
+  3. Browser default dibuka ke http://localhost:8765
+  4. HTML auto-refresh setiap 15 detik → selalu data terbaru
+
+Logo & animasi custom (opsional):
+  Taruh file berikut di folder assets/ (folder ini di root project,
+  sejajar dengan main.py) — dashboard OTOMATIS memakainya kalau ada,
+  dan tetap pakai tampilan arc-reactor bawaan kalau belum ada:
+
+    assets/logo.(png|jpg|jpeg|svg|webp)
+        → logo statis, ditampilkan saat status Standby.
+
+    assets/logo_animasi.(gif|webp|mp4|webm)
+        → ditampilkan menggantikan logo statis saat Friday aktif
+          (Mendengarkan / Memproses / Berbicara / Browsing / Riset / Vision).
+
+  Tidak perlu ubah kode apa pun — cukup taruh file dengan nama itu,
+  lalu refresh/buka ulang dashboard.
 """
 
 import os
 import html as _html_lib
+import mimetypes
 import threading
 import webbrowser
 from datetime import datetime
@@ -19,6 +35,24 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 
 PORT = 8765
 _TMPDIR = os.environ.get("TMPDIR") or "/tmp"
+
+# Folder assets/ di root project (satu level di atas folder modules/)
+ASSETS_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets"
+)
+os.makedirs(ASSETS_DIR, exist_ok=True)
+
+_LOGO_EXT      = ("png", "jpg", "jpeg", "svg", "webp")
+_ANIMASI_EXT   = ("gif", "webp", "mp4", "webm")
+
+
+def _cari_asset(basename: str, ekstensi: tuple) -> str | None:
+    """Cari file assets/<basename>.<ext> — return nama file relatif jika ketemu."""
+    for ext in ekstensi:
+        fname = f"{basename}.{ext}"
+        if os.path.isfile(os.path.join(ASSETS_DIR, fname)):
+            return fname
+    return None
 
 _data = {
     "nama"       : "Angga",
@@ -112,6 +146,43 @@ def _generate_html() -> str:
 
     status_color = {"Standby":"#00e5ff","Mendengarkan":"#00ff88","Memproses":"#ff9800","Berbicara":"#c850ff"}.get(status,"#00e5ff")
 
+    # ── Logo/animasi custom (assets/logo.*, assets/logo_animasi.*) ──
+    # Fallback otomatis ke arc-reactor CSS bawaan kalau belum ada aset.
+    logo_file    = _cari_asset("logo", _LOGO_EXT)
+    animasi_file = _cari_asset("logo_animasi", _ANIMASI_EXT)
+
+    if logo_file:
+        if animasi_file and animasi_file.rsplit(".", 1)[1] in ("mp4", "webm"):
+            animasi_tag = (
+                f'<video id="logoAnim" src="/assets/{animasi_file}" '
+                f'autoplay loop muted playsinline style="display:none;" '
+                f'class="logo-custom"></video>'
+            )
+        elif animasi_file:
+            animasi_tag = (
+                f'<img id="logoAnim" src="/assets/{animasi_file}" '
+                f'style="display:none;" class="logo-custom" alt="Friday">'
+            )
+        else:
+            animasi_tag = ""
+
+        logo_html = (
+            '<div class="reactor-wrap">'
+            f'  <img id="logoStatic" src="/assets/{logo_file}" class="logo-custom" alt="Friday">'
+            f'  {animasi_tag}'
+            '</div>'
+        )
+    else:
+        # Fallback: arc-reactor CSS bawaan (tidak ada aset custom)
+        logo_html = (
+            '<div class="reactor-wrap">'
+            '  <div class="reactor">'
+            '    <div class="ring r1"></div><div class="ring r2"></div>'
+            '    <div class="ring r3"></div><div class="ring r4"></div>'
+            '  </div>'
+            '</div>'
+        )
+
     html = f"""<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -142,6 +213,7 @@ body::after{{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 
 /* ── Arc Reactor ── */
 .reactor-wrap{{display:flex;justify-content:center;margin:10px 0 14px;}}
+.logo-custom{{max-width:140px;max-height:140px;width:auto;height:auto;object-fit:contain;filter:drop-shadow(0 0 18px rgba(0,229,255,0.5));}}
 .reactor{{position:relative;width:88px;height:88px;}}
 .ring{{position:absolute;border-radius:50%;border:2px solid transparent;}}
 .r1{{inset:0;border-color:#00e5ff;animation:spin1 6s linear infinite;box-shadow:0 0 12px #00e5ff;}}
@@ -239,15 +311,10 @@ body::after{{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 
 <div class="wrap">
 
-  <!-- Arc Reactor + Logo -->
-  <div class="reactor-wrap">
-    <div class="reactor">
-      <div class="ring r1"></div><div class="ring r2"></div>
-      <div class="ring r3"></div><div class="ring r4"></div>
-    </div>
-  </div>
+  <!-- Arc Reactor / Logo custom -->
+  {logo_html}
   <div class="logo-wrap"><span class="logo">FRIDAY</span></div>
-  <div class="logo-sub">AI PERSONAL ASSISTANT &nbsp;·&nbsp; v4.0 PREMIUM</div>
+  <div class="logo-sub">AI PERSONAL ASSISTANT &nbsp;·&nbsp; v5.0 PREMIUM</div>
 
   <!-- Status + Tombol STOP -->
   <div class="status-bar">
@@ -353,6 +420,18 @@ function pollStatus(){{
     if(dot){{dot.style.background=col;dot.style.boxShadow='0 0 10px '+col;}}
     if(val)val.textContent=d.status.toUpperCase();
     if(btn)btn.style.display=d.status==='Berbicara'?'flex':'none';
+
+    // Logo custom: tampilkan animasi selama Friday aktif, logo statis saat Standby
+    const logoStatic=document.getElementById('logoStatic');
+    const logoAnim=document.getElementById('logoAnim');
+    if(logoStatic && logoAnim){{
+      const aktif = d.status !== 'Standby';
+      logoAnim.style.display   = aktif ? 'block' : 'none';
+      logoStatic.style.display = aktif ? 'none'  : 'block';
+      if(aktif && logoAnim.tagName==='VIDEO' && logoAnim.paused){{
+        logoAnim.play().catch(()=>{{}});
+      }}
+    }}
   }}).catch(()=>{{}});
 }}
 setInterval(pollStatus,4000);
@@ -461,12 +540,43 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(payload)
             return
 
+        if self.path.startswith("/assets/"):
+            self._serve_asset(self.path[len("/assets/"):])
+            return
+
         html = _generate_html().encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(html)))
         self.end_headers()
         self.wfile.write(html)
+
+    def _serve_asset(self, nama_file: str):
+        """Serve file statis dari folder assets/ (logo & animasi custom)."""
+        # os.path.basename mencegah path traversal (mis. ../../secret.txt)
+        nama_aman = os.path.basename(nama_file)
+        path = os.path.join(ASSETS_DIR, nama_aman)
+
+        if not os.path.isfile(path):
+            self.send_response(404)
+            self.end_headers()
+            return
+
+        content_type = mimetypes.guess_type(path)[0] or "application/octet-stream"
+        try:
+            with open(path, "rb") as f:
+                data = f.read()
+        except OSError:
+            self.send_response(404)
+            self.end_headers()
+            return
+
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        self.wfile.write(data)
 
     def _json(self, payload: bytes):
         self.send_response(200)
