@@ -24,7 +24,7 @@ import threading
 import subprocess
 from modules.tampilan import tampilkan_friday_bicara, tampilkan_status
 
-EDGE_VOICE = "en-GB-RyanNeural"   # British male — paling mirip JARVIS
+EDGE_VOICE = "id-ID-GadisNeural"   # Wanita Indonesia — jelas & sesuai karakter F.R.I.D.A.Y. (wanita)
 
 _TMPDIR    = os.environ.get("TMPDIR") or os.path.dirname(os.path.abspath(__file__))
 TEMP_AUDIO = os.path.join(_TMPDIR, "friday_voice.mp3")
@@ -183,6 +183,17 @@ def _bicara_pyttsx3(teks: str) -> bool:
     except Exception as e:
         tampilkan_status(f"pyttsx3 gagal init: {e}", "peringatan")
         return False
+
+    # Coba pilih voice Bahasa Indonesia kalau ada di SAPI5 Windows —
+    # kalau tidak ada, tetap pakai voice default sistem.
+    try:
+        for voice in engine.getProperty("voices"):
+            info = f"{voice.name} {' '.join(voice.languages or [])} {voice.id}".lower()
+            if "indonesia" in info or "id-id" in info or "bahasa" in info:
+                engine.setProperty("voice", voice.id)
+                break
+    except Exception:
+        pass
 
     hasil = [False]
 
