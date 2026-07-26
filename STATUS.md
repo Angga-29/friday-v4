@@ -18,8 +18,15 @@ dimigrasi total ke:
 - **Fallback offline**: Ollama, model `qwen2.5:7b`
 - **Kamera**: webcam USB eMeet C960 (lokal, via OpenCV `VideoCapture`) —
   bukan IP Webcam Android lagi
-- **UI**: dashboard web JARVIS-style (`http://localhost:8765`, buka
-  otomatis di browser default), mendukung logo & animasi custom
+- **UI**: dua lapis —
+  1. Dashboard web JARVIS-style (`http://localhost:8765`, buka otomatis
+     di browser default), mendukung logo & animasi custom, untuk lihat
+     detail (cuaca/berita/status).
+  2. **Widget logo mengambang** (`modules/overlay.py`, pakai `pywebview`)
+     — window kecil transparan, always-on-top, bisa di-drag, muncul di
+     tengah-atas layar, menampilkan logo + ring animasi yang berdenyut
+     lebih cepat saat Friday bicara. OPSIONAL — kalau `pywebview` tidak
+     terinstall, Friday tetap jalan normal tanpa widget ini.
 - **Suara**: Edge-TTS `id-ID-GadisNeural` (Bahasa Indonesia, wanita),
   fallback `pyttsx3` (SAPI5 offline) lalu `gTTS`
 
@@ -120,6 +127,18 @@ Semua perubahan migrasi ada di branch **`claude/repository-data-analysis-3r209c`
   — keduanya menyediakan modul `cv2` yang sama dan akan saling menimpa.
   `requirements.txt` sudah benar hanya mencantumkan `opencv-contrib-python`
   (mencakup semua fitur + `cv2.face` untuk pengenalan wajah).
+- **Widget mengambang (`modules/overlay.py`) belum pernah dites GUI-nya
+  secara nyata** (sandbox pengembangan tidak punya display Windows).
+  Yang sudah divalidasi: endpoint `/widget` HTTP-nya benar, fallback
+  graceful kalau `pywebview` tidak ada. Yang BELUM divalidasi: tampilan
+  transparansi/drag/always-on-top beneran di Windows -- kemungkinan
+  perlu beberapa iterasi perbaikan setelah dicoba pertama kali.
+- **Shutdown Friday saat widget overlay aktif**: karena loop asisten
+  jalan di background thread (bukan main thread) supaya overlay bisa
+  pegang main thread untuk GUI, Ctrl+C di terminal TIDAK selalu
+  ditangkap bersih. Cara shutdown paling rapi: perintah suara
+  "keluar"/"matikan Friday", bukan Ctrl+C. Kalau `pywebview` tidak
+  diinstall, perilaku lama (Ctrl+C normal) tetap berlaku.
 - **Webcam tidak terdeteksi**: pastikan tidak ada app lain (Zoom/Teams/
   Camera Windows) yang sedang memakai kamera; coba index 0-4 lewat
   `daftar_kamera_tersedia()`.
