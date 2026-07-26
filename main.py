@@ -489,11 +489,7 @@ def jalankan():
     waktu_terakhir_gerak  = 0
     waktu_gerak_terakhir  = 0
 
-    bicara(
-        f"Sistem siap, Bos {config.NAMA_PENGGUNA}. "
-        "Versi empat aktif dengan skill system dan riset mendalam. "
-        "Panggil saya dengan hai Friday kapan saja."
-    )
+    bicara(f"Sistem siap, Bos {config.NAMA_PENGGUNA}.")
 
     tampilkan_header()
     tampilkan_status("Loop utama aktif. Tekan Ctrl+C untuk keluar.", "sukses")
@@ -597,18 +593,10 @@ def jalankan():
                         pop_up_berita(state["cache_berita"])
 
                         if nama_dikenal:
-                            bicara(f"Halo, {nama_dikenal}! {state['cache_waktu']}")
+                            bicara(f"Halo, {nama_dikenal}.")
                             memori.catat_interaksi("wajah")
                         else:
-                            bicara(f"Halo, Bos {config.NAMA_PENGGUNA}! {state['cache_waktu']}")
-
-                        time.sleep(0.4)
-                        bicara(f"Laporan cuaca. {state['cache_cuaca']}")
-                        time.sleep(0.4)
-                        bicara(
-                            "Saya siap membantu. Bisa bertanya apa saja, "
-                            "atau panggil saya dengan hai Friday."
-                        )
+                            bicara(f"Halo, Bos {config.NAMA_PENGGUNA}.")
 
                     # ── 6. DENGARKAN ─────────────────────────────────
                     set_status("Mendengarkan")
