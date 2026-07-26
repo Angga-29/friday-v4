@@ -26,6 +26,7 @@ import subprocess
 from modules.tampilan import tampilkan_friday_bicara, tampilkan_status
 
 EDGE_VOICE = "id-ID-GadisNeural"   # Wanita Indonesia — jelas & sesuai karakter F.R.I.D.A.Y. (wanita)
+EDGE_RATE  = "+15%"                # Kecepatan bicara — default Edge-TTS terasa lambat untuk asisten
 
 _TMPDIR    = os.environ.get("TMPDIR") or os.path.dirname(os.path.abspath(__file__))
 TEMP_AUDIO = os.path.join(_TMPDIR, "friday_voice.mp3")
@@ -88,7 +89,7 @@ def _generate_edge_tts_sync(teks: str) -> bool:
         asyncio.set_event_loop(loop)
         try:
             import edge_tts
-            communicate = edge_tts.Communicate(teks, EDGE_VOICE)
+            communicate = edge_tts.Communicate(teks, EDGE_VOICE, rate=EDGE_RATE)
             loop.run_until_complete(communicate.save(TEMP_AUDIO))
             hasil[0] = True
         except ImportError:
@@ -168,10 +169,13 @@ def _putar_audio(file_path: str) -> bool:
     return False
 
 
+PYTTSX3_RATE = 190   # kata per menit — default SAPI5 (~170) terasa lambat
+
 _PYTTSX3_SCRIPT = (
     "import sys, pyttsx3\n"
     "teks = sys.stdin.buffer.read().decode('utf-8')\n"
     "e = pyttsx3.init()\n"
+    f"e.setProperty('rate', {PYTTSX3_RATE})\n"
     "for v in e.getProperty('voices'):\n"
     "    info = (v.name + ' ' + ' '.join(v.languages or []) + ' ' + v.id).lower()\n"
     "    if 'indonesia' in info or 'id-id' in info or 'bahasa' in info:\n"
