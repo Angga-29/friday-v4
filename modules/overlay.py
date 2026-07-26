@@ -39,6 +39,25 @@ def _lebar_layar() -> int:
         return 1920
 
 
+def _tunggu_server(port: int, timeout: float = 15.0) -> bool:
+    """
+    Polling sampai HTTP server dashboard benar-benar merespons, sebelum
+    bikin window overlay yang connect ke situ. Lapis pengaman kedua --
+    main.py sudah start server lebih awal, tapi ini jaga-jaga kalau
+    urutan pemanggilan berubah di kemudian hari.
+    """
+    import socket
+    import time as _time
+    batas = _time.time() + timeout
+    while _time.time() < batas:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=1):
+                return True
+        except OSError:
+            _time.sleep(0.2)
+    return False
+
+
 def mulai_overlay():
     """
     Jalankan widget mengambang. BLOCKING -- menjalankan event loop GUI,
@@ -57,6 +76,15 @@ def mulai_overlay():
         return
 
     from modules.dashboard import PORT
+
+    if not _tunggu_server(PORT):
+        from modules.tampilan import tampilkan_status
+        tampilkan_status(
+            f"Dashboard server tidak merespons di port {PORT} — widget dilewati.",
+            "peringatan"
+        )
+        return
+
     lebar_layar = _lebar_layar()
     x = max(0, (lebar_layar - WIDGET_WIDTH) // 2)
 

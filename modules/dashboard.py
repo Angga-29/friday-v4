@@ -709,6 +709,16 @@ def _start_server():
             _server_started = True
 
 
+def pastikan_server_jalan():
+    """
+    Start HTTP server (bind + listen) SEKARANG, tanpa buka browser.
+    Dipanggil sedini mungkin di main.py (sebelum thread lain/overlay
+    dimulai) supaya http://localhost:PORT/... sudah bisa diakses saat
+    dibutuhkan (mis. widget overlay yang connect di awal startup).
+    """
+    _start_server()
+
+
 def buka_dashboard():
     """Start HTTP server lalu buka http://localhost:PORT di browser default."""
     _start_server()

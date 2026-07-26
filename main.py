@@ -641,6 +641,16 @@ if __name__ == "__main__":
     from modules.overlay import tersedia as _overlay_tersedia
 
     if _overlay_tersedia():
+        # PENTING: start HTTP server dashboard SEKARANG, sebelum thread
+        # asisten/overlay dimulai -- inisialisasi_semua() butuh beberapa
+        # detik (kamera, Claude AI, Ollama, dll) sebelum sampai ke
+        # buka_dashboard(), tapi widget overlay di bawah langsung coba
+        # connect ke http://localhost:8765/widget begitu dibuat. Tanpa
+        # ini, overlay bisa connect sebelum server listen -> muncul
+        # blank/gagal load dan tidak pernah retry.
+        from modules.dashboard import pastikan_server_jalan
+        pastikan_server_jalan()
+
         # Widget mengambang (pywebview) WAJIB pegang main thread untuk GUI
         # di Windows -- jadi loop asisten dipindah ke background thread,
         # dan main thread dipakai khusus jalankan event loop overlay.
