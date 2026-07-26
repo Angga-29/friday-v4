@@ -35,6 +35,10 @@ numpy>=1.26.0
 # Browsing Internet
 ddgs>=0.6.0
 
+# Cari & putar video YouTube (skills/video.py) -- cuma untuk cari/ambil
+# URL video, TIDAK dipakai untuk download/simpan video
+yt-dlp>=2024.1.0
+
 # Terminal Warna
 colorama>=0.4.6
 
