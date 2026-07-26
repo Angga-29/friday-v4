@@ -87,6 +87,7 @@ class DetektorTepuk:
             return
 
         from modules.tampilan import tampilkan_status
+        from modules.audio_lock import PYAUDIO_INIT_LOCK
 
         pa     = None
         stream = None
@@ -96,15 +97,17 @@ class DetektorTepuk:
             try:
                 # ── Buka mic jika belum ──
                 if pa is None:
-                    pa = pyaudio.PyAudio()
+                    with PYAUDIO_INIT_LOCK:
+                        pa = pyaudio.PyAudio()
                 if stream is None:
-                    stream = pa.open(
-                        format=pyaudio.paInt16,
-                        channels=1,
-                        rate=RATE,
-                        input=True,
-                        frames_per_buffer=CHUNK,
-                    )
+                    with PYAUDIO_INIT_LOCK:
+                        stream = pa.open(
+                            format=pyaudio.paInt16,
+                            channels=1,
+                            rate=RATE,
+                            input=True,
+                            frames_per_buffer=CHUNK,
+                        )
                     retry = 0
                     tampilkan_status(
                         "👏 Double clap aktif. Tepuk 2x untuk memanggil Friday.", "sukses"

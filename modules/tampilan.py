@@ -49,7 +49,7 @@ def _wrap_teks(teks: str, lebar: int) -> list:
 
 
 def bersihkan_layar():
-    os.system('clear')
+    os.system('cls' if os.name == 'nt' else 'clear')
 
 
 # ==============================================================
@@ -87,7 +87,7 @@ def tampilkan_header():
 
     fitur = [
         ("●", "Claude AI",            "ONLINE", G),
-        ("●", "Edge-TTS  (en-GB-Ryan)", "AKTIF", G),
+        ("●", "Edge-TTS  (id-ID-Gadis)", "AKTIF", G),
         ("●", "Wake Word + Clap",      "AKTIF",  G),
         ("●", "Skills System",         "LOADED", G),
         ("●", "Browser + Berita",      "AKTIF",  G),

@@ -16,6 +16,7 @@ import threading
 import time
 import speech_recognition as sr
 from modules.tampilan import tampilkan_status
+from modules.audio_lock import PYAUDIO_INIT_LOCK
 
 # --- Wake word yang dikenal ---
 WAKE_WORDS = [
@@ -51,7 +52,11 @@ class WakeWordDetector:
         global _flac_error_sudah_dilog
 
         try:
-            with sr.Microphone() as source:
+            with PYAUDIO_INIT_LOCK:
+                mic = sr.Microphone()
+            with PYAUDIO_INIT_LOCK:
+                source = mic.__enter__()
+            try:
                 self.recognizer.adjust_for_ambient_noise(source, duration=JEDA_KALIBRASI)
                 tampilkan_status("Wake word listener aktif. Panggil 'Hai Friday'.", "info")
 
@@ -114,6 +119,8 @@ class WakeWordDetector:
                         else:
                             tampilkan_status(f"Wake word error: {e}", "peringatan")
                             time.sleep(1)
+            finally:
+                mic.__exit__(None, None, None)
 
         except OSError:
             tampilkan_status(
