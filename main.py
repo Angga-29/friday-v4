@@ -627,10 +627,38 @@ def jalankan():
         if _KAMERA_TERSEDIA:
             lepas_kamera(state["kamera_cap"])
         tutup_dashboard()
+        try:
+            from modules.overlay import tutup_overlay
+            tutup_overlay()
+        except Exception:
+            pass
         tampilkan_divider()
         tampilkan_status("Friday berhasil dimatikan. Memori tersimpan.", "sukses")
 
 
 # ==============================================================
 if __name__ == "__main__":
-    jalankan()
+    from modules.overlay import tersedia as _overlay_tersedia
+
+    if _overlay_tersedia():
+        # Widget mengambang (pywebview) WAJIB pegang main thread untuk GUI
+        # di Windows -- jadi loop asisten dipindah ke background thread,
+        # dan main thread dipakai khusus jalankan event loop overlay.
+        #
+        # CATATAN: karena loop asisten tidak lagi di main thread, Ctrl+C
+        # di terminal tidak selalu ditangkap bersih oleh handler
+        # KeyboardInterrupt di jalankan() -- untuk shutdown rapi, pakai
+        # perintah suara "keluar"/"matikan Friday", atau tutup widget-nya.
+        _thread_asisten = threading.Thread(
+            target=jalankan, daemon=True, name="FridayAssistantLoop"
+        )
+        _thread_asisten.start()
+
+        from modules.overlay import mulai_overlay
+        mulai_overlay()   # BLOCKING -- event loop GUI widget mengambang
+
+        _thread_asisten.join(timeout=5)
+    else:
+        # pywebview tidak terinstall -- jalan seperti biasa tanpa widget,
+        # loop asisten langsung di main thread (perilaku lama, tidak berubah).
+        jalankan()

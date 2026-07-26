@@ -6,6 +6,11 @@
 # HTTP & API
 requests>=2.31.0
 
+# Widget logo mengambang (window kecil transparan, always-on-top, bisa
+# di-drag) -- pakai WebView2 Windows bawaan, opsional (Friday tetap jalan
+# tanpa ini, cuma tanpa widget visual, fallback ke dashboard browser saja)
+pywebview>=5.0
+
 # Claude (Anthropic) AI + Vision — otak utama
 anthropic>=0.40.0
 

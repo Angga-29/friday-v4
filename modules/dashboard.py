@@ -54,6 +54,88 @@ def _cari_asset(basename: str, ekstensi: tuple) -> str | None:
             return fname
     return None
 
+
+# CSS logo/ring animasi — dipakai bersama oleh dashboard penuh (_generate_html)
+# dan widget mengambang kecil (_generate_widget_html). Braces TUNGGAL biasa
+# (bukan bagian dari f-string di sini), disisipkan lewat {_LOGO_CSS} nanti.
+_LOGO_CSS = """
+.hud-wrap{position:relative;width:150px;height:150px;display:flex;align-items:center;justify-content:center;}
+.logo-custom{position:relative;z-index:2;max-width:120px;max-height:120px;width:auto;height:auto;object-fit:contain;
+  filter:drop-shadow(0 0 10px rgba(255,140,0,0.55));
+  animation:hud-pulse 2.4s ease-in-out infinite;}
+.hud-ring{position:absolute;border-radius:50%;z-index:1;}
+.hud-ring-out{inset:0;border:2px dashed rgba(255,140,0,0.55);
+  animation:hud-spin 10s linear infinite;}
+.hud-ring-in{inset:16px;border:2px solid transparent;border-top-color:rgba(0,229,255,0.6);
+  border-right-color:rgba(0,229,255,0.6);
+  animation:hud-spin 4s linear infinite reverse;}
+@keyframes hud-spin{to{transform:rotate(360deg);}}
+@keyframes hud-pulse{
+  0%,100%{filter:drop-shadow(0 0 10px rgba(255,140,0,0.55));transform:scale(1);}
+  50%{filter:drop-shadow(0 0 20px rgba(255,140,0,0.85));transform:scale(1.03);}
+}
+/* Saat Friday aktif (bukan Standby) — ring berputar lebih cepat & glow lebih kuat */
+.hud-wrap.aktif .hud-ring-out{animation-duration:3s;border-color:rgba(255,140,0,0.9);}
+.hud-wrap.aktif .hud-ring-in{animation-duration:1.3s;}
+.hud-wrap.aktif .logo-custom{animation-duration:0.9s;}
+.reactor{position:relative;width:88px;height:88px;}
+.ring{position:absolute;border-radius:50%;border:2px solid transparent;}
+.r1{inset:0;border-color:#00e5ff;animation:spin1 6s linear infinite;box-shadow:0 0 12px #00e5ff;}
+.r2{inset:8px;border-color:rgba(0,229,255,0.5);border-style:dashed;animation:spin1 4s linear infinite reverse;}
+.r3{inset:18px;border-color:#00bcd4;animation:spin1 3s linear infinite;}
+.r4{inset:28px;border-radius:50%;background:radial-gradient(circle,#fff 0%,#00e5ff 40%,rgba(0,229,255,0.1) 70%,transparent 100%);animation:pulse-r 2s ease-in-out infinite;}
+@keyframes spin1{to{transform:rotate(360deg);}}
+@keyframes pulse-r{0%,100%{box-shadow:0 0 20px #00e5ff,0 0 40px rgba(0,229,255,0.4);}50%{box-shadow:0 0 35px #00e5ff,0 0 60px rgba(0,229,255,0.7);}}
+"""
+
+
+def _bangun_logo_html() -> str:
+    """
+    Bangun HTML area logo (custom + ring animasi, atau fallback arc-reactor
+    bawaan). Dipakai bersama oleh dashboard penuh dan widget mengambang.
+    """
+    logo_file    = _cari_asset("logo", _LOGO_EXT)
+    animasi_file = _cari_asset("logo_animasi", _ANIMASI_EXT)
+
+    if not logo_file:
+        return (
+            '<div class="reactor-wrap">'
+            '  <div class="reactor">'
+            '    <div class="ring r1"></div><div class="ring r2"></div>'
+            '    <div class="ring r3"></div><div class="ring r4"></div>'
+            '  </div>'
+            '</div>'
+        )
+
+    if animasi_file and animasi_file.rsplit(".", 1)[1] in ("mp4", "webm"):
+        animasi_tag = (
+            f'<video id="logoAnim" src="/assets/{animasi_file}" '
+            f'autoplay loop muted playsinline style="display:none;" '
+            f'class="logo-custom"></video>'
+        )
+    elif animasi_file:
+        animasi_tag = (
+            f'<img id="logoAnim" src="/assets/{animasi_file}" '
+            f'style="display:none;" class="logo-custom" alt="Friday">'
+        )
+    else:
+        animasi_tag = ""
+
+    # Ring animasi ala JARVIS (berputar + glow berdenyut) dibungkus DI
+    # BELAKANG logo custom — logo & tulisannya tetap tegak/jelas, tidak
+    # ikut berputar seperti gambar aslinya.
+    return (
+        '<div class="reactor-wrap">'
+        '  <div class="hud-wrap">'
+        '    <div class="hud-ring hud-ring-out"></div>'
+        '    <div class="hud-ring hud-ring-in"></div>'
+        f'    <img id="logoStatic" src="/assets/{logo_file}" class="logo-custom" alt="Friday">'
+        f'    {animasi_tag}'
+        '  </div>'
+        '</div>'
+    )
+
+
 _data = {
     "nama"       : "Angga",
     "waktu"      : "",
@@ -148,47 +230,7 @@ def _generate_html() -> str:
 
     # ── Logo/animasi custom (assets/logo.*, assets/logo_animasi.*) ──
     # Fallback otomatis ke arc-reactor CSS bawaan kalau belum ada aset.
-    logo_file    = _cari_asset("logo", _LOGO_EXT)
-    animasi_file = _cari_asset("logo_animasi", _ANIMASI_EXT)
-
-    if logo_file:
-        if animasi_file and animasi_file.rsplit(".", 1)[1] in ("mp4", "webm"):
-            animasi_tag = (
-                f'<video id="logoAnim" src="/assets/{animasi_file}" '
-                f'autoplay loop muted playsinline style="display:none;" '
-                f'class="logo-custom"></video>'
-            )
-        elif animasi_file:
-            animasi_tag = (
-                f'<img id="logoAnim" src="/assets/{animasi_file}" '
-                f'style="display:none;" class="logo-custom" alt="Friday">'
-            )
-        else:
-            animasi_tag = ""
-
-        # Ring animasi ala JARVIS (berputar + glow berdenyut) dibungkus
-        # DI BELAKANG logo custom — logo & tulisannya tetap tegak/jelas,
-        # tidak ikut berputar seperti gambar aslinya.
-        logo_html = (
-            '<div class="reactor-wrap">'
-            '  <div class="hud-wrap">'
-            '    <div class="hud-ring hud-ring-out"></div>'
-            '    <div class="hud-ring hud-ring-in"></div>'
-            f'    <img id="logoStatic" src="/assets/{logo_file}" class="logo-custom" alt="Friday">'
-            f'    {animasi_tag}'
-            '  </div>'
-            '</div>'
-        )
-    else:
-        # Fallback: arc-reactor CSS bawaan (tidak ada aset custom)
-        logo_html = (
-            '<div class="reactor-wrap">'
-            '  <div class="reactor">'
-            '    <div class="ring r1"></div><div class="ring r2"></div>'
-            '    <div class="ring r3"></div><div class="ring r4"></div>'
-            '  </div>'
-            '</div>'
-        )
+    logo_html = _bangun_logo_html()
 
     html = f"""<!DOCTYPE html>
 <html lang="id">
@@ -220,35 +262,7 @@ body::after{{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 
 /* ── Arc Reactor ── */
 .reactor-wrap{{display:flex;justify-content:center;margin:10px 0 14px;}}
-
-/* ── HUD wrap: bungkus logo custom dengan ring animasi ala JARVIS ── */
-.hud-wrap{{position:relative;width:150px;height:150px;display:flex;align-items:center;justify-content:center;}}
-.logo-custom{{position:relative;z-index:2;max-width:120px;max-height:120px;width:auto;height:auto;object-fit:contain;
-  filter:drop-shadow(0 0 10px rgba(255,140,0,0.55));
-  animation:hud-pulse 2.4s ease-in-out infinite;}}
-.hud-ring{{position:absolute;border-radius:50%;z-index:1;}}
-.hud-ring-out{{inset:0;border:2px dashed rgba(255,140,0,0.55);
-  animation:hud-spin 10s linear infinite;}}
-.hud-ring-in{{inset:16px;border:2px solid transparent;border-top-color:rgba(0,229,255,0.6);
-  border-right-color:rgba(0,229,255,0.6);
-  animation:hud-spin 4s linear infinite reverse;}}
-@keyframes hud-spin{{to{{transform:rotate(360deg);}}}}
-@keyframes hud-pulse{{
-  0%,100%{{filter:drop-shadow(0 0 10px rgba(255,140,0,0.55));transform:scale(1);}}
-  50%{{filter:drop-shadow(0 0 20px rgba(255,140,0,0.85));transform:scale(1.03);}}
-}}
-/* Saat Friday aktif (bukan Standby) — ring berputar lebih cepat & glow lebih kuat */
-.hud-wrap.aktif .hud-ring-out{{animation-duration:3s;border-color:rgba(255,140,0,0.9);}}
-.hud-wrap.aktif .hud-ring-in{{animation-duration:1.3s;}}
-.hud-wrap.aktif .logo-custom{{animation-duration:0.9s;}}
-.reactor{{position:relative;width:88px;height:88px;}}
-.ring{{position:absolute;border-radius:50%;border:2px solid transparent;}}
-.r1{{inset:0;border-color:#00e5ff;animation:spin1 6s linear infinite;box-shadow:0 0 12px #00e5ff;}}
-.r2{{inset:8px;border-color:rgba(0,229,255,0.5);border-style:dashed;animation:spin1 4s linear infinite reverse;}}
-.r3{{inset:18px;border-color:#00bcd4;animation:spin1 3s linear infinite;}}
-.r4{{inset:28px;border-radius:50%;background:radial-gradient(circle,#fff 0%,#00e5ff 40%,rgba(0,229,255,0.1) 70%,transparent 100%);animation:pulse-r 2s ease-in-out infinite;}}
-@keyframes spin1{{to{{transform:rotate(360deg);}}}}
-@keyframes pulse-r{{0%,100%{{box-shadow:0 0 20px #00e5ff,0 0 40px rgba(0,229,255,0.4);}}50%{{box-shadow:0 0 35px #00e5ff,0 0 60px rgba(0,229,255,0.7);}}}}
+{_LOGO_CSS}
 
 /* ── FRIDAY logo ── */
 .logo-wrap{{text-align:center;margin-bottom:4px;}}
@@ -538,6 +552,56 @@ setInterval(tick,1000);tick();
     return html
 
 
+def _generate_widget_html() -> str:
+    """
+    HTML minimal untuk widget mengambang (bukan tab browser penuh) —
+    cuma logo + ring animasi + polling status, background transparan,
+    dipakai oleh modules/overlay.py (window pywebview frameless).
+    """
+    logo_html = _bangun_logo_html()
+
+    return f"""<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Friday Widget</title>
+<style>
+html, body {{
+  margin:0; padding:0; background:transparent; overflow:hidden;
+  width:100%; height:100%;
+  display:flex; align-items:center; justify-content:center;
+}}
+.reactor-wrap {{ display:flex; justify-content:center; }}
+{_LOGO_CSS}
+</style>
+</head>
+<body>
+{logo_html}
+<script>
+const STATUS_ACTIVE = {{'Standby': false}};
+function pollStatus() {{
+  fetch('/status').then(r => r.json()).then(d => {{
+    const aktif = d.status !== 'Standby';
+    const logoStatic = document.getElementById('logoStatic');
+    const logoAnim   = document.getElementById('logoAnim');
+    if (logoStatic && logoAnim) {{
+      logoAnim.style.display   = aktif ? 'block' : 'none';
+      logoStatic.style.display = aktif ? 'none'  : 'block';
+      if (aktif && logoAnim.tagName === 'VIDEO' && logoAnim.paused) {{
+        logoAnim.play().catch(() => {{}});
+      }}
+    }}
+    const hudWrap = document.querySelector('.hud-wrap');
+    if (hudWrap) hudWrap.classList.toggle('aktif', aktif);
+  }}).catch(() => {{}});
+}}
+setInterval(pollStatus, 300);   // lebih sering dari dashboard penuh -- widget harus terasa "hidup" instan
+pollStatus();
+</script>
+</body>
+</html>"""
+
+
 # Callback untuk barge-in — di-set oleh main.py setelah import suara
 _stop_callback = None
 
@@ -572,6 +636,15 @@ class _Handler(BaseHTTPRequestHandler):
 
         if self.path.startswith("/assets/"):
             self._serve_asset(self.path[len("/assets/"):])
+            return
+
+        if self.path == "/widget":
+            html = _generate_widget_html().encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(html)))
+            self.end_headers()
+            self.wfile.write(html)
             return
 
         html = _generate_html().encode("utf-8")
