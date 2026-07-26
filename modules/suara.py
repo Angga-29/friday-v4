@@ -26,7 +26,7 @@ import subprocess
 from modules.tampilan import tampilkan_friday_bicara, tampilkan_status
 
 EDGE_VOICE = "id-ID-GadisNeural"   # Wanita Indonesia — jelas & sesuai karakter F.R.I.D.A.Y. (wanita)
-EDGE_RATE  = "+15%"                # Kecepatan bicara — default Edge-TTS terasa lambat untuk asisten
+EDGE_RATE  = "+25%"                 # Kecepatan bicara — default Edge-TTS terasa lambat untuk asisten
 
 _TMPDIR    = os.environ.get("TMPDIR") or os.path.dirname(os.path.abspath(__file__))
 TEMP_AUDIO = os.path.join(_TMPDIR, "friday_voice.mp3")
@@ -169,7 +169,7 @@ def _putar_audio(file_path: str) -> bool:
     return False
 
 
-PYTTSX3_RATE = 190   # kata per menit — default SAPI5 (~170) terasa lambat
+PYTTSX3_RATE = 210   # kata per menit — default SAPI5 (~170) terasa lambat
 
 _PYTTSX3_SCRIPT = (
     "import sys, pyttsx3\n"

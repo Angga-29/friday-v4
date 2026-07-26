@@ -598,17 +598,12 @@ def jalankan():
                         else:
                             bicara(f"Halo, Bos {config.NAMA_PENGGUNA}.")
 
-                    # ── 6. DENGARKAN ─────────────────────────────────
-                    set_status("Mendengarkan")
-                    suara_user = dengarkan(setelah_tts=True)
-                    set_status("Standby")
-
-                    if suara_user:
-                        if proses_jawaban(suara_user, ai, memori, skill_manager):
-                            break
-                        time.sleep(1)
-                    else:
-                        bicara("Maaf, saya tidak mendengar. Silakan ulangi.")
+                    # Catatan: Friday TIDAK otomatis mendengarkan cuma karena
+                    # ada orang di depan kamera -- itu bikin dia salah dengar
+                    # noise/obrolan latar terus-menerus lalu ngomong "saya
+                    # tidak mendengar" berulang-ulang. Mendengarkan HANYA
+                    # dipicu wake word "Hai Friday" (ditangani di step 2 di
+                    # atas), sama seperti mode suara-saja.
 
                 else:
                     if sudah_menyapa and waktu_kini - waktu_terakhir_sapaan > COOLDOWN_SAPAAN:
