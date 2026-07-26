@@ -19,6 +19,7 @@ Anti-echo:
 
 import os
 import re
+import sys
 import time
 import threading
 import subprocess
@@ -167,58 +168,69 @@ def _putar_audio(file_path: str) -> bool:
     return False
 
 
+_PYTTSX3_SCRIPT = (
+    "import sys, pyttsx3\n"
+    "teks = sys.stdin.buffer.read().decode('utf-8')\n"
+    "e = pyttsx3.init()\n"
+    "for v in e.getProperty('voices'):\n"
+    "    info = (v.name + ' ' + ' '.join(v.languages or []) + ' ' + v.id).lower()\n"
+    "    if 'indonesia' in info or 'id-id' in info or 'bahasa' in info:\n"
+    "        e.setProperty('voice', v.id)\n"
+    "        break\n"
+    "e.say(teks)\n"
+    "e.runAndWait()\n"
+)
+
+
 def _bicara_pyttsx3(teks: str) -> bool:
     """
     TTS offline via pyttsx3 (membungkus SAPI5 di Windows).
-    Dijalankan di thread terpisah supaya bisa diinterupsi (barge-in)
-    lewat engine.stop() tanpa memblokir thread utama.
+
+    WAJIB dijalankan sebagai SUBPROCESS terpisah, bukan Python thread —
+    pyttsx3/SAPI5 memakai COM yang terikat ke thread yang membuatnya.
+    Kalau engine dibuat di satu thread lalu di-drive (say/runAndWait)
+    dari thread lain, panggilannya bisa HANG SELAMANYA tanpa error
+    (COM marshalling menunggu message loop yang tidak pernah jalan).
+    Subprocess terpisah menghindari itu total, sekaligus tetap bisa
+    diinterupsi (barge-in) lewat proc.terminate() — sama seperti mpv/ffplay.
     """
+    global _proses_audio
+
     try:
-        import pyttsx3
+        import pyttsx3  # noqa: F401 -- hanya cek tersedia sebelum spawn proses
     except ImportError:
         return False
 
     try:
-        engine = pyttsx3.init()
-    except Exception as e:
-        tampilkan_status(f"pyttsx3 gagal init: {e}", "peringatan")
-        return False
-
-    # Coba pilih voice Bahasa Indonesia kalau ada di SAPI5 Windows —
-    # kalau tidak ada, tetap pakai voice default sistem.
-    try:
-        for voice in engine.getProperty("voices"):
-            info = f"{voice.name} {' '.join(voice.languages or [])} {voice.id}".lower()
-            if "indonesia" in info or "id-id" in info or "bahasa" in info:
-                engine.setProperty("voice", voice.id)
-                break
-    except Exception:
-        pass
-
-    hasil = [False]
-
-    def _run():
+        proc = subprocess.Popen(
+            [sys.executable, "-c", _PYTTSX3_SCRIPT],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        _proses_audio = proc
         try:
-            engine.say(teks)
-            engine.runAndWait()
-            hasil[0] = True
-        except Exception as e:
-            tampilkan_status(f"pyttsx3 error: {e}", "peringatan")
+            proc.stdin.write(teks.encode("utf-8"))
+            proc.stdin.close()
+        except (BrokenPipeError, OSError):
+            pass
 
-    t = threading.Thread(target=_run, daemon=True)
-    t.start()
+        while proc.poll() is None:
+            if _interrupt_event.is_set():
+                proc.terminate()
+                try:
+                    proc.wait(timeout=1)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                _proses_audio = None
+                return True   # dianggap selesai (diinterrupt)
+            time.sleep(0.05)
 
-    while t.is_alive():
-        if _interrupt_event.is_set():
-            try:
-                engine.stop()
-            except Exception:
-                pass
-            t.join(timeout=1)
-            return True   # dianggap selesai (diinterrupt)
-        time.sleep(0.05)
-
-    return hasil[0]
+        _proses_audio = None
+        return proc.returncode == 0
+    except Exception as e:
+        tampilkan_status(f"pyttsx3 error: {e}", "peringatan")
+        return False
 
 
 def bicara(teks: str) -> None:
