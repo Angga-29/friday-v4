@@ -107,8 +107,15 @@ Semua perubahan migrasi ada di branch **`claude/repository-data-analysis-3r209c`
 
 ## Known Gotchas (sudah diantisipasi, tapi belum pernah diuji di Windows asli)
 
-- **PyAudio gagal install via pip**: jalankan
-  `pip install pipwin && pipwin install pyaudio`
+- **PyAudio gagal install (Python terlalu baru, mis. 3.14+)**: wheel
+  prebuilt PyAudio/pipwin biasanya baru tersedia beberapa bulan setelah
+  rilis Python baru. Solusi: install **Python 3.12** khusus untuk project
+  ini (`winget install Python.Python.3.12`), hapus venv lama
+  (`Remove-Item -Recurse -Force venv`), lalu buat ulang dengan
+  `py -3.12 -m venv venv`. `setup_windows.ps1` sudah diupdate untuk
+  otomatis mengutamakan Python 3.12 lewat `py` launcher kalau tersedia.
+- **PyAudio gagal build dari source (Python versi wajar, bukan kasus di atas)**:
+  jalankan `pip install pipwin && pipwin install pyaudio`
 - **JANGAN install `opencv-python` DAN `opencv-contrib-python` bersamaan**
   — keduanya menyediakan modul `cv2` yang sama dan akan saling menimpa.
   `requirements.txt` sudah benar hanya mencantumkan `opencv-contrib-python`

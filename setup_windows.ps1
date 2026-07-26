@@ -16,19 +16,36 @@ Write-Host "  FRIDAY AI v5.0.0 — Setup Windows" -ForegroundColor Cyan
 Write-Host "  Platform: Windows Desktop + USB Webcam (eMeet C960)" -ForegroundColor Cyan
 Write-Host ""
 
-# 1. Cek Python
+# 1. Cari Python yang cocok — utamakan 3.12 (paling stabil untuk semua
+#    dependency, termasuk PyAudio yang wheel-nya sering telat untuk
+#    versi Python paling baru). Fallback ke "python" default kalau
+#    3.12 tidak tersedia lewat py launcher.
+$PyCmd = $null
 try {
-    $pyVersion = python --version
-    Write-Host "[OK] $pyVersion terdeteksi." -ForegroundColor Green
-} catch {
-    Write-Host "[GAGAL] Python tidak ditemukan. Install dari https://python.org (centang 'Add to PATH')." -ForegroundColor Red
-    exit 1
+    $null = & py -3.12 --version 2>$null
+    if ($LASTEXITCODE -eq 0) { $PyCmd = "py -3.12" }
+} catch {}
+
+if (-not $PyCmd) {
+    try {
+        $pyVersion = python --version
+        Write-Host "[PERINGATAN] Python 3.12 tidak terdeteksi lewat 'py -3.12'." -ForegroundColor Yellow
+        Write-Host "             Memakai '$pyVersion' (default) — kalau versi ini terlalu baru" -ForegroundColor Yellow
+        Write-Host "             (mis. 3.14+), instalasi PyAudio bisa gagal karena belum ada" -ForegroundColor Yellow
+        Write-Host "             wheel prebuilt. Solusi: winget install Python.Python.3.12" -ForegroundColor Yellow
+        $PyCmd = "python"
+    } catch {
+        Write-Host "[GAGAL] Python tidak ditemukan. Install dari https://python.org (centang 'Add to PATH')." -ForegroundColor Red
+        exit 1
+    }
+} else {
+    Write-Host "[OK] Python 3.12 terdeteksi via py launcher — dipakai untuk venv." -ForegroundColor Green
 }
 
 # 2. Buat virtual environment jika belum ada
 if (-not (Test-Path "venv")) {
     Write-Host "[..] Membuat virtual environment..." -ForegroundColor Yellow
-    python -m venv venv
+    Invoke-Expression "$PyCmd -m venv venv"
 }
 Write-Host "[OK] Virtual environment siap." -ForegroundColor Green
 

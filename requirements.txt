@@ -49,6 +49,15 @@ python-dotenv>=1.0.0
 #   Jika PyAudio gagal build dari source, pakai wheel precompiled:
 #     pip install pipwin && pipwin install pyaudio
 #
+#   PENTING — pakai Python 3.12 (BUKAN versi paling baru, mis. 3.14+):
+#   wheel prebuilt PyAudio (dan pipwin) biasanya baru tersedia beberapa
+#   bulan setelah rilis Python baru. Kalau install PyAudio gagal dengan
+#   pesan soal "no matching distribution"/build error, itu tandanya
+#   versi Python-mu terlalu baru — install Python 3.12 dari python.org
+#   atau `winget install Python.Python.3.12`, lalu buat ulang venv
+#   pakai `py -3.12 -m venv venv` (setup_windows.ps1 sudah otomatis
+#   mengutamakan 3.12 kalau tersedia).
+#
 #   Audio player (wajib, tidak lewat pip):
 #     mpv    → https://mpv.io/installation/  (atau: winget install mpv)
 #     ffmpeg → https://ffmpeg.org/download.html (fallback ffplay)
